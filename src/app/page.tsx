@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Table, TRACK, type Column } from "@/components/ui/Table";
 import { Text } from "@/components/ui/Text";
 import { Brand, TopBar, UserChip } from "@/components/ui/TopBar";
-import { listCases } from "@/data/mock";
+import { listCases } from "@/db/repository";
 import { workspace } from "@/data/workspace";
 import { caseListSummary } from "@/domain/cases";
 import type { Case } from "@/domain/model";
@@ -22,8 +22,8 @@ const caseColumns: readonly Column<Case>[] = [
   { id: "chevron", width: "auto", render: () => <Text variant="muted"><Icon name="chevron-right" /></Text> },
 ];
 
-export default function CaseListPage() {
-  const cases = listCases();
+export default async function CaseListPage() {
+  const cases = await listCases();
   return (
     <>
       <TopBar start={<Brand name={workspace.productName} office={workspace.officeName} />} end={<UserChip initials={workspace.userInitials} />} />

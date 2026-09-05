@@ -1,4 +1,5 @@
 import type { IconName } from "@/components/ui/icons";
+import type { CandidateTag } from "./computeStatus";
 import type { Tone } from "./tone";
 
 /** Shape shared by every status-like enum: what the badge shows. */
@@ -42,6 +43,16 @@ export const FIELD_STATUS_META: Record<FieldStatus, FieldStatusMeta> = {
   derived: { label: "abgeleitet", tone: "proposed", icon: "corner-down-right", rank: 2, hasFinding: false, isOpen: true, hasNoSource: false },
   redacted: { label: "geschwärzt", tone: "neutral", icon: "eye-off", rank: 1, hasFinding: false, isOpen: false, hasNoSource: true },
   confirmed: { label: "bestätigt", tone: "confirmed", icon: "circle-check", rank: 1, hasFinding: false, isOpen: false, hasNoSource: false },
+};
+
+/* ---------- Candidate tag: how a value came to be ---------- */
+
+/** Fallback label on a candidate card when the run recorded no shorter note. */
+export const CANDIDATE_TAG_LABEL: Record<CandidateTag, string> = {
+  extracted: "Fundstelle",
+  manual: "manuell korrigiert",
+  derived: "abgeleitet",
+  redacted: "geschwärzt",
 };
 
 /* ---------- Overview groups (bar, legend and banner count with these) ---------- */

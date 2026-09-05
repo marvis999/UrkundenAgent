@@ -1,2 +1,2 @@
 ## Stack
-TypeScript, Supabase, Next.js, Claude CLI for development, OpenRouter API for production
+TypeScript, Next.js, PostgreSQL via `pg` in Docker (no Supabase), Claude CLI for development, OpenRouter API for production

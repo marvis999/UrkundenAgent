@@ -2,20 +2,26 @@
   "name": "urkunden-agent",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.9.0"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "import": "node --env-file-if-exists=.env scripts/import-documents.mjs",
+    "db:reset": "node --env-file-if-exists=.env scripts/reset-database.mjs"
   },
   "dependencies": {
     "next": "^15.5.25",
+    "pg": "^8.23.0",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "typescript": "^5"

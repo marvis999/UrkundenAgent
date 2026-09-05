@@ -1,3 +1,4 @@
+import type { CandidateTag } from "./computeStatus";
 import type {
   Actor,
   CaseStatus,
@@ -64,15 +65,23 @@ export type CandidateTarget = { kind: "subfield"; subfieldId: string } | { kind:
 export interface Candidate {
   id: string;
   target: CandidateTarget;
-  value: string;
+  /** Null only for a redacted passage: the Fundstelle exists, the value does not. */
+  value: string | null;
   sourceLabel: string;
-  sourceClass: SourceClass;
-  documentId: string;
-  page: number;
-  confidence: number;
-  tag: string;
+  /** How the value came to be. Drives what the candidate must carry; see the data model. */
+  tag: CandidateTag;
+  /** Short German label on the card, e.g. "spaeterer Stand". Falls back to the tag. */
+  note?: string;
+  /** Absent for manual and derived candidates, which have no document behind them. */
+  sourceClass?: SourceClass;
+  documentId?: string;
+  page?: number;
+  confidence?: number;
   quote?: string;
+  /** The model's sentence, or the person's reason for a manual correction. */
+  rationale?: string;
   image?: ImageEvidence;
+  /** Whether this is the candidate the value currently comes from. */
   isActive: boolean;
 }
 
@@ -131,7 +140,9 @@ export interface Field {
   request?: RequestTemplate;
   /** Set when a request would be wrong, e.g. deliberately redacted data. */
   noRequestReason?: string;
+  /** Set while a sent request for this field has not been reconciled by a later run. */
   requestedAt?: string;
+  /** A run later than the first produced a value here. */
   isNew?: boolean;
   /** Run-level events that concern the whole field. Value-level events sit on the part. */
   history: HistoryEntry[];
@@ -197,8 +208,13 @@ export interface CaseView {
   documents: Document[];
   runs: Run[];
   clauses: readonly Clause[];
-  /** Field ids currently in the request basket. */
+  /**
+   * Positions of the request currently in play: the draft basket if one is open,
+   * otherwise the request that was sent and is still awaiting a reply.
+   */
   basket: FieldId[];
+  /** Set once that request has gone out. Until then the basket is still editable. */
+  requestSentAt?: string;
   recipient: string;
   recipientEmail: string;
   /** Pages read per document while a run is in progress. */

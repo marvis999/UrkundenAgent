@@ -1,23 +1,31 @@
+import { chooseCandidateAction, confirmValueAction } from "@/app/actions";
+import { ActionForm } from "@/components/ui/ActionForm";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { OptionGroup } from "@/components/ui/OptionGroup";
 import { Text } from "@/components/ui/Text";
 import type { Candidate } from "@/domain/model";
-import { SOURCE_CLASS_LABEL } from "@/domain/status";
+import { CANDIDATE_TAG_LABEL, SOURCE_CLASS_LABEL } from "@/domain/status";
 import { routes } from "@/lib/routes";
 import { ImageFrame } from "./ImageFrame";
 import styles from "./CandidateCard.module.css";
 
 interface CandidateCardProps {
   caseId: string;
+  /** The field and value this candidate feeds, so confirming knows what it confirms. */
+  fieldId: string;
+  partId: string;
   candidate: Candidate;
   /** Whether the value this candidate feeds has been confirmed by a human. */
   confirmed: boolean;
 }
 
+const REDACTED_VALUE = "unlesbar gemacht";
+
 /** One Fundstelle. Several of these stand side by side with equal rank; only a human picks. */
-export function CandidateCard({ caseId, candidate, confirmed }: CandidateCardProps) {
-  const documentHref = routes.document(caseId, candidate.documentId, candidate.page);
+export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed }: CandidateCardProps) {
+  // A manual correction or a derived value has no document behind it; its origin is its reason.
+  const documentHref = candidate.documentId === undefined ? undefined : routes.document(caseId, candidate.documentId, candidate.page);
   const activeLabel = confirmed ? "im Feld, bestätigt" : "im Feld, nicht bestätigt";
   const adoptLabel = candidate.isActive ? "Wert bestätigen" : "Diesen Wert nehmen";
 
@@ -25,7 +33,7 @@ export function CandidateCard({ caseId, candidate, confirmed }: CandidateCardPro
     <article className={[styles.card, candidate.isActive ? styles.active : ""].join(" ")}>
       <header className={styles.header}>
         <div className={styles.headline}>
-          <span className={styles.value}>{candidate.value}</span>
+          <span className={styles.value}>{candidate.value ?? REDACTED_VALUE}</span>
           <Text variant="muted">{candidate.sourceLabel}</Text>
           {candidate.isActive && (
             <Badge tone={confirmed ? "confirmed" : "neutral"} icon="corner-down-right">
@@ -34,12 +42,13 @@ export function CandidateCard({ caseId, candidate, confirmed }: CandidateCardPro
           )}
         </div>
         <div className={styles.tags}>
-          <Badge tone="neutral">{SOURCE_CLASS_LABEL[candidate.sourceClass]}</Badge>
-          <Badge tone="neutral">{candidate.tag}</Badge>
+          {candidate.sourceClass && <Badge tone="neutral">{SOURCE_CLASS_LABEL[candidate.sourceClass]}</Badge>}
+          <Badge tone="neutral">{candidate.note ?? CANDIDATE_TAG_LABEL[candidate.tag]}</Badge>
         </div>
       </header>
 
       {candidate.quote && <blockquote className={styles.quote}>{`„${candidate.quote}“`}</blockquote>}
+      {!candidate.quote && candidate.rationale && <Text variant="muted">{candidate.rationale}</Text>}
 
       {candidate.image && (
         <div className={styles.image}>
@@ -48,9 +57,11 @@ export function CandidateCard({ caseId, candidate, confirmed }: CandidateCardPro
             caption={candidate.image.caption}
             size="inline"
             action={
-              <Button variant="surface" icon="search" href={documentHref}>
-                Ganzes Bild
-              </Button>
+              documentHref && (
+                <Button variant="surface" icon="search" href={documentHref}>
+                  Ganzes Bild
+                </Button>
+              )
             }
           />
           <Text variant="muted">{candidate.image.hint}</Text>
@@ -67,12 +78,19 @@ export function CandidateCard({ caseId, candidate, confirmed }: CandidateCardPro
       )}
 
       <footer className={styles.actions}>
-        <Button variant="accent" icon="check">
-          {adoptLabel}
-        </Button>
-        <Button variant="secondary" icon="file-search" href={documentHref}>
-          Im Dokument
-        </Button>
+        <ActionForm
+          action={candidate.isActive ? confirmValueAction : chooseCandidateAction}
+          values={candidate.isActive ? { case: caseId, field: fieldId, part: partId } : { case: caseId, candidate: candidate.id }}
+        >
+          <Button variant="accent" icon="check" submit>
+            {adoptLabel}
+          </Button>
+        </ActionForm>
+        {documentHref && (
+          <Button variant="secondary" icon="file-search" href={documentHref}>
+            Im Dokument
+          </Button>
+        )}
       </footer>
     </article>
   );

@@ -1,0 +1,4 @@
+/* The form is only a carrier for the action; it must not affect layout. */
+.form {
+  display: contents;
+}

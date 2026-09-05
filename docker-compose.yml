@@ -1,0 +1,50 @@
+# Urkunden-Zuarbeit.
+#
+#   docker compose up -d db      nur Postgres, App lokal mit `npm run dev`
+#   docker compose up            Postgres und App, http://localhost:3000
+#
+# Die Unterlagen sind vertraulich und liegen ausschließlich in den Volumes unten,
+# nie im Image und nie im Repository.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-urkunden}
+      POSTGRES_USER: ${POSTGRES_USER:-urkunden}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-urkunden}
+      # Deutsche Sortierung und Zeitzone, damit Listen und Zeitstempel stimmen.
+      POSTGRES_INITDB_ARGS: "--locale=de_DE.UTF-8 --encoding=UTF8"
+      TZ: Europe/Berlin
+      PGTZ: Europe/Berlin
+    ports:
+      # Nur lokal erreichbar, nicht im Netz.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-urkunden} -d ${POSTGRES_DB:-urkunden}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-urkunden}:${POSTGRES_PASSWORD:-urkunden}@db:5432/${POSTGRES_DB:-urkunden}
+      URKUNDEN_DATA_DIR: /data
+      TZ: Europe/Berlin
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    volumes:
+      # Die Originalunterlagen. Bleiben erhalten, wenn das Image neu gebaut wird.
+      - documents:/data
+
+volumes:
+  db-data:
+  documents:

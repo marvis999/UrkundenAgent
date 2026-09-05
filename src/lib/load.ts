@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getCaseView } from "@/data/mock";
+import { getCaseView } from "@/db/repository";
 import { FIELD_IDS, type CaseView, type FieldId } from "@/domain/model";
 import { documentById } from "@/domain/evidence";
 
@@ -9,7 +9,7 @@ export type SearchParams = Promise<Record<string, string | string[] | undefined>
 
 export const loadCaseView = async (params: CaseParams): Promise<CaseView> => {
   const { caseId } = await params;
-  const view = getCaseView(caseId);
+  const view = await getCaseView(caseId);
   if (!view) notFound();
   return view;
 };

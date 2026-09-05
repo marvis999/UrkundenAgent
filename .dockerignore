@@ -1,0 +1,16 @@
+node_modules
+.next
+.next-verify
+out
+data
+.git
+.env
+.env.*
+!.env.example
+test_files
+Claude Design
+docs
+*.tsbuildinfo
+*.code-workspace
+*.doku
+scratchpad
