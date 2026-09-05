@@ -204,6 +204,21 @@ test("a truncated answer is reported as truncated, never parsed", async () => {
   await assert.rejects(provider.complete(request()), LlmTruncatedError);
 });
 
+test("a text-only model asked for an image is explained, not blamed on the slug", async () => {
+  // Real body from OpenRouter for z-ai/glm-5.3 with an image part.
+  const body = JSON.stringify({ error: { message: "No endpoints found that support image input", code: 404 } });
+  const { fetchImpl } = recorder([new Response(body, { status: 404 })]);
+  const provider = createOpenRouterProvider({ config: config(), fetchImpl });
+
+  await assert.rejects(provider.complete(request()), (error: unknown) => {
+    assert.ok(error instanceof LlmTransportError);
+    assert.equal(error.retryable, false);
+    assert.match(error.message, /image input/);
+    assert.match(error.message, /no provider for it supports/);
+    return true;
+  });
+});
+
 test("an error inside a 200 response is still an error", async () => {
   const { fetchImpl } = recorder([json({ error: { code: 400, message: "no endpoints found" } })]);
   const provider = createOpenRouterProvider({ config: config(), fetchImpl });

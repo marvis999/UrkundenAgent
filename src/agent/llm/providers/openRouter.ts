@@ -95,7 +95,15 @@ const isRetryable = (status: number) => RETRYABLE_STATUS.has(status) || status >
 const describe = (status: number, detail: string): string => {
   if (status === 401) return `OpenRouter rejected the API key (401). Check OPENROUTER_API_KEY. ${detail}`;
   if (status === 402) return `OpenRouter reports insufficient credit (402). ${detail}`;
-  if (status === 404) return `OpenRouter does not know this model (404). Check OPENROUTER_MODEL. ${detail}`;
+  // A 404 is also how OpenRouter reports "no endpoint can do what you asked",
+  // e.g. an image part for a text-only model, so do not blame the slug alone.
+  if (status === 404) {
+    return (
+      `OpenRouter could not route this request (404): either OPENROUTER_MODEL does not exist, ` +
+      `or no provider for it supports what was asked (image input, or a JSON schema with ` +
+      `OPENROUTER_STRUCTURED_OUTPUTS=1). ${detail}`
+    );
+  }
   if (status === 429) return `OpenRouter rate limit (429). ${detail}`;
   return `OpenRouter request failed (${status}). ${detail}`;
 };
