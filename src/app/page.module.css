@@ -1,0 +1,17 @@
+.product {
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+.office {
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+}
+.fileNumber {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

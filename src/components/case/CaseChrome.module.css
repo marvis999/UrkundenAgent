@@ -1,0 +1,28 @@
+.chrome {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.name {
+  font-weight: 600;
+  font-size: var(--text-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fileNumber {
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+}
+.band {
+  width: var(--page-width);
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+  display: flex;
+  flex-direction: column;
+}
+/* The banner continues the active tab: no top-left radius. */
+.band > :last-child {
+  border-top-left-radius: 0;
+}

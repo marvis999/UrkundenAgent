@@ -1,0 +1,30 @@
+.subtitle {
+  font-weight: 400;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.body {
+  padding: var(--space-5);
+}
+.number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius);
+  background: var(--color-surface-strong);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.itemTitle {
+  font-weight: 600;
+}
+.footerHint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.footerActions {
+  display: flex;
+  gap: var(--space-2);
+}

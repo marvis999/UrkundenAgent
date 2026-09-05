@@ -1,0 +1,36 @@
+/* Candidates stand side by side with equal rank; they wrap when the row is narrow. */
+.candidates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--candidate-min-width), 1fr));
+  gap: var(--space-3);
+}
+
+.consequence {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.required {
+  font-size: var(--text-sm);
+  color: var(--color-missing-fg);
+}
+
+.history {
+  font-size: var(--text-sm);
+}
+.muted {
+  color: var(--color-text-muted);
+}
+.strong {
+  font-weight: 600;
+}

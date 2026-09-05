@@ -1,0 +1,170 @@
+:root {
+  /* Ink */
+  --color-ink: #16181a;
+  --color-text-secondary: #3c4145;
+  --color-text-muted: #5f6469;
+  --color-text-faint: #82878b;
+  --color-text-disabled: #9aa0a4;
+  --color-link: #14509b;
+  --color-on-dark: #ffffff;
+
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-sunken: #fafaf7;
+  --color-surface-muted: #f4f4f0;
+  --color-surface-strong: #f0f0ec;
+  --color-surface-hover: #e6e6e1;
+  --color-border: #eeeeea;
+  --color-border-strong: #b3b8bb;
+  --color-dark: #16181a;
+  --color-dark-hover: #2a2e31;
+  --color-paper-photo: #ddd3bd;
+  --color-paper-ink: #5d5340;
+  --color-backdrop: rgba(20, 22, 24, 0.34);
+  --color-backdrop-strong: rgba(20, 22, 24, 0.4);
+  --color-surface-translucent: rgba(255, 255, 255, 0.72);
+  --color-overlay-pill: rgba(20, 22, 24, 0.74);
+  --color-outline-selected: rgba(20, 22, 24, 0.35);
+  --color-marker-fill: rgba(232, 255, 26, 0.24);
+
+  /* Accent */
+  --color-accent: #e8ff1a;
+  --color-accent-hover: #f0ff6b;
+
+  /* Tones */
+  --color-confirmed-fg: #0d6b3a;
+  --color-confirmed-bg: #cbeed6;
+  --color-confirmed-tint: #f1f9f4;
+  --color-confirmed-tint-strong: #e6f4ec;
+  --color-proposed-fg: #14509b;
+  --color-proposed-bg: #d3e4fb;
+  --color-proposed-tint: #f2f7fd;
+  --color-proposed-tint-strong: #e6effb;
+  --color-attention-fg: #8a4300;
+  --color-attention-bg: #fde5c0;
+  --color-attention-tint: #fdf5e9;
+  --color-attention-tint-strong: #fbecd7;
+  --color-missing-fg: #a81d14;
+  --color-missing-bg: #fdd9d4;
+  --color-missing-tint: #fdf3f1;
+  --color-missing-tint-strong: #fbe7e3;
+  --color-neutral-fg: #4a4f53;
+  --color-neutral-bg: #e6e6e1;
+  --color-neutral-tint: #fafaf7;
+  --color-neutral-tint-strong: #f2f2ee;
+  --color-accent-fg: #16181a;
+  --color-accent-bg: #e8ff1a;
+  --color-accent-tint: #fbffd6;
+  --color-accent-tint-strong: #f6ffb0;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 60px;
+
+  /* Type */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 21px;
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --tracking-caps: 0.1em;
+
+  /* Shape */
+  --radius: 3px;
+  --radius-lg: 4px;
+  --gap-rows: 3px;
+  --chevron-width: 18px;
+  --image-excerpt-height: 176px;
+  --candidate-min-width: 340px;
+  --control-height: 32px;
+  --hairline: 1px;
+  --outline-width: 1.5px;
+  --focus-ring: 2px solid var(--color-accent);
+  --duration-expand: 220ms;
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --shadow-overlay: 0 24px 60px rgba(22, 24, 26, 0.25);
+
+  /* Layout */
+  --page-width: 1120px;
+  --side-column: 300px;
+  --drawer-width: 560px;
+  --viewer-width: 1060px;
+  --thumb-width: 44px;
+  --viewer-page-width: 560px;
+  --paper-ratio: 1 / 1.41;
+}
+
+/* A tone sets the variables every tinted element reads. */
+[data-tone="confirmed"] { --tone-fg: var(--color-confirmed-fg); --tone-bg: var(--color-confirmed-bg); --tone-tint: var(--color-confirmed-tint); --tone-tint-strong: var(--color-confirmed-tint-strong); }
+[data-tone="proposed"] { --tone-fg: var(--color-proposed-fg); --tone-bg: var(--color-proposed-bg); --tone-tint: var(--color-proposed-tint); --tone-tint-strong: var(--color-proposed-tint-strong); }
+[data-tone="attention"] { --tone-fg: var(--color-attention-fg); --tone-bg: var(--color-attention-bg); --tone-tint: var(--color-attention-tint); --tone-tint-strong: var(--color-attention-tint-strong); }
+[data-tone="missing"] { --tone-fg: var(--color-missing-fg); --tone-bg: var(--color-missing-bg); --tone-tint: var(--color-missing-tint); --tone-tint-strong: var(--color-missing-tint-strong); }
+[data-tone="neutral"] { --tone-fg: var(--color-neutral-fg); --tone-bg: var(--color-neutral-bg); --tone-tint: var(--color-neutral-tint); --tone-tint-strong: var(--color-neutral-tint-strong); }
+[data-tone="accent"] { --tone-fg: var(--color-accent-fg); --tone-bg: var(--color-accent-bg); --tone-tint: var(--color-accent-tint); --tone-tint-strong: var(--color-accent-tint-strong); }
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  text-wrap: pretty;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+h1,
+h2,
+h3,
+p,
+blockquote,
+figure {
+  margin: 0;
+}
+
+/* Shared text utilities: the only place these combinations live. */
+.muted {
+  color: var(--color-text-muted);
+}
+.faint {
+  color: var(--color-text-faint);
+  font-size: var(--text-sm);
+}
+.strong {
+  font-weight: 600;
+}
+.mono {
+  font-family: var(--font-mono), monospace;
+}

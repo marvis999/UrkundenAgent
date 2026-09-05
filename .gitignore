@@ -1,0 +1,13 @@
+test_files/*
+*.code-workspace
+*.doku
+Claude Design/*
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.env
+.env.*
+!.env.example
+dokumente/

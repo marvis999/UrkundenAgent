@@ -1,0 +1,79 @@
+.notice {
+  border-radius: var(--radius);
+  color: var(--color-ink);
+}
+.solid {
+  background: var(--tone-bg);
+}
+.tint {
+  background: var(--tone-tint);
+}
+.plain {
+  background: var(--color-surface-muted);
+}
+.white {
+  background: var(--color-surface);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.compact .row {
+  padding: var(--space-3);
+}
+.regular .row {
+  padding: var(--space-4);
+}
+.prominent .row {
+  padding: var(--space-4) var(--space-5);
+  align-items: center;
+}
+
+.icon {
+  display: flex;
+  flex: none;
+  color: var(--tone-fg);
+  padding-top: 1px;
+}
+.prominent .icon {
+  padding-top: 0;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.title {
+  font-weight: 600;
+  color: var(--tone-fg);
+}
+.prominent .title {
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+}
+.text {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+.compact .text {
+  font-size: var(--text-sm);
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.children {
+  padding: 0 var(--space-4) var(--space-4);
+}
+.prominent .children {
+  padding: 0 var(--space-5) var(--space-4);
+}

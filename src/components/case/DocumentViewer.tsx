@@ -1,0 +1,98 @@
+import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
+import { Notice } from "@/components/ui/Notice";
+import { Overlay } from "@/components/ui/Overlay";
+import { PageIndicators, type PageIndicator } from "@/components/ui/PageIndicators";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { candidateOnPage, clampPage, pagesWithEvidence } from "@/domain/evidence";
+import type { CaseView, Document } from "@/domain/model";
+import { DOCUMENT_KIND_ICON, DOCUMENT_STATUS_META } from "@/domain/status";
+import { routes } from "@/lib/routes";
+import { ImageFrame } from "./ImageFrame";
+import styles from "./DocumentViewer.module.css";
+
+interface DocumentViewerProps {
+  view: CaseView;
+  document: Document;
+  page: number;
+}
+
+/** Modal viewer: photos as image with marker, text pages with the highlighted passage. */
+export function DocumentViewer({ view, document, page: requestedPage }: DocumentViewerProps) {
+  const caseId = view.case.id;
+  const page = clampPage(requestedPage, document.pageCount);
+  const hits = pagesWithEvidence(view, document.id);
+  const located = candidateOnPage(view, document.id, page);
+  const isPhoto = document.kind === "photo";
+  const pageHref = (n: number) => routes.document(caseId, document.id, clampPage(n, document.pageCount));
+
+  const thumbnails: PageIndicator[] = Array.from({ length: document.pageCount }, (_, i) => {
+    const number = i + 1;
+    return { number, state: number === page ? "current" : hits.has(number) ? "hit" : "pending", href: pageHref(number) };
+  });
+
+  return (
+    <Overlay
+      placement="center"
+      closeHref={routes.caseDocuments(caseId)}
+      title={
+        <>
+          <Icon name={DOCUMENT_KIND_ICON[document.kind]} size="lg" />
+          <span>{document.fileName}</span>
+          <StatusBadge meta={DOCUMENT_STATUS_META[document.status]} />
+        </>
+      }
+      headerEnd={
+        <>
+          <Button variant="ghost" icon="chevron-left" href={pageHref(page - 1)} disabled={page === 1} label="Vorherige Seite" />
+          <span className={styles.pager}>
+            Seite {page} von {document.pageCount}
+          </span>
+          <Button variant="ghost" icon="chevron-right" href={pageHref(page + 1)} disabled={page === document.pageCount} label="Nächste Seite" />
+        </>
+      }
+      footer={
+        located && (
+          <>
+            <Button variant="accent" icon="check">
+              Fundstelle übernehmen
+            </Button>
+            <span className={styles.footerHint}>
+              {located.field.label}: {located.candidate.value}
+            </span>
+          </>
+        )
+      }
+    >
+      <div className={styles.layout}>
+        <div className={styles.thumbs}>
+          <PageIndicators pages={thumbnails} variant="thumbnails" paper={isPhoto ? "photo" : "text"} />
+        </div>
+        <div className={styles.stage}>
+          {isPhoto ? (
+            <div className={styles.photo}>
+              <ImageFrame crop={located?.candidate.image?.crop} caption={document.photoNote?.caption ?? document.type} size="page" />
+              {document.photoNote && <Notice tone="neutral" icon="scan-text" text={document.photoNote.hint} size="compact" surface="white" />}
+            </div>
+          ) : (
+            <div className={styles.sheet}>
+              <div className={styles.sheetHeader}>
+                <span className={styles.sheetTitle}>{document.title}</span>
+                <span className={styles.sheetSubtitle}>{document.subtitle}</span>
+              </div>
+              <div className={styles.lines} />
+              {located?.candidate.quote && (
+                <div className={styles.hit}>
+                  <span className={styles.hitLabel}>Fundstelle</span>
+                  <span>{located.candidate.quote}</span>
+                </div>
+              )}
+              <div className={styles.lines} />
+              <div className={[styles.lines, styles.short].join(" ")} />
+            </div>
+          )}
+        </div>
+      </div>
+    </Overlay>
+  );
+}

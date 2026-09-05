@@ -1,0 +1,90 @@
+/* The container owns the column template; rows join it via subgrid so auto columns align across rows. */
+.table {
+  display: grid;
+  grid-template-columns: var(--table-columns);
+  row-gap: var(--gap-rows);
+}
+
+/* A row plus its optional detail. Spans all columns and passes the template down. */
+.group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.row,
+.header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  column-gap: var(--space-4);
+  align-items: center;
+  border-radius: var(--radius);
+}
+.regular .row {
+  padding: var(--space-4) var(--space-4);
+}
+.compact .row {
+  padding: var(--space-3) var(--space-3);
+}
+
+.header {
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.body {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+.group[data-tone] .body {
+  background: var(--tone-bg);
+}
+.link:hover,
+.trigger:hover {
+  background: var(--color-surface-strong);
+}
+.group[data-tone] .link:hover,
+.group[data-tone] .trigger:hover {
+  background: var(--tone-tint-strong);
+}
+
+/* Expandable rows are buttons; reset the button look and mark the open one. */
+.trigger {
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--duration-expand) var(--easing-standard);
+}
+.group[data-open="true"] > .trigger {
+  box-shadow: inset 0 0 0 var(--outline-width) var(--color-outline-selected);
+}
+
+.detail {
+  margin-top: var(--gap-rows);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.cell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.end {
+  justify-content: flex-end;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

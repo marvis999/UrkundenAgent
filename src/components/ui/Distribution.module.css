@@ -1,0 +1,39 @@
+.distribution {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.bar {
+  display: flex;
+  gap: var(--gap-rows);
+  height: 14px;
+}
+.segment {
+  flex: var(--segment-weight);
+  border-radius: 2px;
+  background: var(--tone-bg);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+a.legendItem:hover .label {
+  color: var(--color-ink);
+}
+.legendIcon {
+  display: flex;
+  color: var(--tone-fg);
+}
+.count {
+  font-weight: 600;
+}
+.label {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}

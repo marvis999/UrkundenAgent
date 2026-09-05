@@ -1,0 +1,59 @@
+.strip {
+  display: flex;
+}
+
+/* dots */
+.dots {
+  gap: 3px;
+  align-items: center;
+}
+.dots .page {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--color-surface-hover);
+}
+.dots .done {
+  background: var(--color-text-secondary);
+}
+.dots .current {
+  background: var(--color-accent);
+}
+
+/* thumbnails */
+.thumbnails {
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.thumbnails .page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.thumbnails .current {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+.sheet {
+  display: block;
+  width: var(--thumb-width);
+  aspect-ratio: var(--paper-ratio);
+  border-radius: 2px;
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 var(--hairline) var(--color-border);
+}
+.photo .sheet {
+  background: var(--color-paper-photo);
+}
+.thumbnails .current .sheet {
+  box-shadow: inset 0 0 0 var(--outline-width) var(--color-border-strong);
+}
+.thumbnails .hit .sheet {
+  background: var(--color-accent-tint);
+  box-shadow: inset 0 0 0 var(--outline-width) var(--color-accent);
+}

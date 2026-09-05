@@ -1,0 +1,33 @@
+/* Height animates via the grid track; the content keeps its natural size and is clipped. */
+.region {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  transition: grid-template-rows var(--duration-expand) var(--easing-standard);
+}
+[data-open="true"] > .region {
+  grid-template-rows: 1fr;
+}
+
+/* No padding here: a padded box cannot shrink below its padding, so padding lives on the children. */
+.content {
+  display: flow-root;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--space-2)));
+  transition:
+    opacity var(--duration-expand) var(--easing-standard),
+    transform var(--duration-expand) var(--easing-standard);
+}
+[data-open="true"] > .region > .content {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .region,
+  .content {
+    transition: none;
+  }
+}
