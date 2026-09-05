@@ -13,3 +13,4 @@ next-env.d.ts
 !.env.example
 data/
 .claude/
+.llm-cache/
