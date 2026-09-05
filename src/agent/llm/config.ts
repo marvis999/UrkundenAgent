@@ -54,7 +54,7 @@ export const readOpenRouterConfig = (env: Env = process.env): OpenRouterConfig =
   const apiKey = env["OPENROUTER_API_KEY"]?.trim();
   if (!apiKey) {
     throw new LlmError(
-      "OPENROUTER_API_KEY is not set. Copy .env.example to .env.local and add a key from https://openrouter.ai/keys.",
+      "OPENROUTER_API_KEY is not set. Copy .env.example to .env and add a key from https://openrouter.ai/keys.",
     );
   }
   return {
