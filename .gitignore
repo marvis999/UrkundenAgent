@@ -4,6 +4,7 @@ test_files/*
 Claude Design/*
 node_modules/
 .next/
+.next-verify/
 out/
 *.tsbuildinfo
 next-env.d.ts
