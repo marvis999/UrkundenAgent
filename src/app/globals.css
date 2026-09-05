@@ -24,7 +24,6 @@
   --color-backdrop-strong: rgba(20, 22, 24, 0.4);
   --color-surface-translucent: rgba(255, 255, 255, 0.72);
   --color-overlay-pill: rgba(20, 22, 24, 0.74);
-  --color-outline-selected: rgba(20, 22, 24, 0.35);
   --color-marker-fill: rgba(232, 255, 26, 0.24);
 
   /* Accent */
@@ -66,6 +65,9 @@
   --space-6: 32px;
   --space-7: 40px;
   --space-8: 60px;
+  --gap-hairline: 2px;
+  --gap-rows: 3px;
+  --optical-nudge: 1px;
 
   /* Type */
   --text-xs: 11px;
@@ -76,31 +78,51 @@
   --text-xl: 21px;
   --leading-tight: 1.2;
   --leading-normal: 1.5;
+  --leading-loose: 1.6;
   --tracking-caps: 0.1em;
 
   /* Shape */
+  --radius-sm: 2px;
   --radius: 3px;
   --radius-lg: 4px;
-  --gap-rows: 3px;
-  --chevron-width: 18px;
-  --image-excerpt-height: 176px;
-  --candidate-min-width: 340px;
-  --control-height: 32px;
   --hairline: 1px;
   --outline-width: 1.5px;
+  --marker-width: 2px;
   --focus-ring: 2px solid var(--color-accent);
+  --shadow-overlay: 0 24px 60px rgba(22, 24, 26, 0.25);
+
+  /* Sizes */
+  --control-height: 32px;
+  --control-height-sm: 28px;
+  --mark-size: 22px;
+  --dot-size: 8px;
+  --bar-height: 14px;
+  --chevron-width: 18px;
+  --thumb-width: 44px;
+  --image-excerpt-height: 176px;
+  --paper-ratio: 1 / 1.41;
+
+  /* Placeholder artwork until real page rendering exists */
+  --faux-line: 6px;
+  --faux-pitch: 20px;
+  --faux-block: 72px;
+  --faux-tilt: -1.7deg;
+
+  /* Stacking: overlays sit above page content wherever they are rendered in the tree. */
+  --z-overlay: 50;
+
+  /* Motion */
+  --duration-fast: 120ms;
   --duration-expand: 220ms;
   --easing-standard: cubic-bezier(0.2, 0, 0, 1);
-  --shadow-overlay: 0 24px 60px rgba(22, 24, 26, 0.25);
 
   /* Layout */
   --page-width: 1120px;
   --side-column: 300px;
   --drawer-width: 560px;
   --viewer-width: 1060px;
-  --thumb-width: 44px;
   --viewer-page-width: 560px;
-  --paper-ratio: 1 / 1.41;
+  --viewer-thumbs-max-height: 70vh;
 }
 
 /* A tone sets the variables every tinted element reads. */
@@ -142,7 +164,7 @@ textarea {
 
 :focus-visible {
   outline: var(--focus-ring);
-  outline-offset: 1px;
+  outline-offset: var(--optical-nudge);
 }
 
 h1,
@@ -152,19 +174,4 @@ p,
 blockquote,
 figure {
   margin: 0;
-}
-
-/* Shared text utilities: the only place these combinations live. */
-.muted {
-  color: var(--color-text-muted);
-}
-.faint {
-  color: var(--color-text-faint);
-  font-size: var(--text-sm);
-}
-.strong {
-  font-weight: 600;
-}
-.mono {
-  font-family: var(--font-mono), monospace;
 }

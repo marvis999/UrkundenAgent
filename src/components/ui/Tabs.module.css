@@ -1,8 +1,8 @@
 /* Tabs sit directly on the status banner; the active tab shares the banner's top edge. */
 .tabs {
   display: flex;
-  gap: 2px;
-  padding-bottom: 2px;
+  gap: var(--gap-hairline);
+  padding-bottom: var(--gap-hairline);
 }
 .tab {
   display: inline-flex;
@@ -30,8 +30,8 @@
   color: var(--color-text-muted);
 }
 .badge {
-  padding: 2px var(--space-2);
-  border-radius: 2px;
+  padding: var(--gap-hairline) var(--space-2);
+  border-radius: var(--radius-sm);
   background: var(--color-accent);
   color: var(--color-ink);
   font-size: var(--text-xs);

@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { OptionGroup } from "@/components/ui/OptionGroup";
+import { Text } from "@/components/ui/Text";
 import type { Candidate } from "@/domain/model";
 import { SOURCE_CLASS_LABEL } from "@/domain/status";
 import { routes } from "@/lib/routes";
@@ -25,7 +26,7 @@ export function CandidateCard({ caseId, candidate, confirmed }: CandidateCardPro
       <header className={styles.header}>
         <div className={styles.headline}>
           <span className={styles.value}>{candidate.value}</span>
-          <span className={styles.source}>{candidate.sourceLabel}</span>
+          <Text variant="muted">{candidate.sourceLabel}</Text>
           {candidate.isActive && (
             <Badge tone={confirmed ? "confirmed" : "neutral"} icon="corner-down-right">
               {activeLabel}
@@ -52,10 +53,10 @@ export function CandidateCard({ caseId, candidate, confirmed }: CandidateCardPro
               </Button>
             }
           />
-          <span className={styles.hint}>{candidate.image.hint}</span>
+          <Text variant="muted">{candidate.image.hint}</Text>
           {candidate.image.readings && (
             <div className={styles.readings}>
-              {candidate.image.question && <span className={styles.question}>{candidate.image.question}</span>}
+              {candidate.image.question && <Text variant="label">{candidate.image.question}</Text>}
               <OptionGroup
                 label="Lesarten"
                 options={candidate.image.readings.map((r) => ({ id: r.value, label: r.value, selected: r.value === candidate.value }))}

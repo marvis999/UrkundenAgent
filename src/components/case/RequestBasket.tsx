@@ -1,10 +1,12 @@
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { Icon } from "@/components/ui/Icon";
 import { ListItem } from "@/components/ui/ListItem";
 import { Notice } from "@/components/ui/Notice";
 import { Overlay } from "@/components/ui/Overlay";
-import { Stack } from "@/components/ui/Page";
+import { Stack } from "@/components/ui/layout";
+import { Text } from "@/components/ui/Text";
 import type { CaseView } from "@/domain/model";
 import { basketItems, requestLetter, requestSubject } from "@/domain/request";
 import { formatPositions } from "@/lib/format";
@@ -28,13 +30,13 @@ export function RequestBasket({ view }: RequestBasketProps) {
         <>
           <Icon name="list-checks" size="lg" />
           <span>Anforderung</span>
-          <span className={styles.subtitle}>{formatPositions(items.length)} aus den Befunden</span>
+          <Text variant="muted">{formatPositions(items.length)} aus den Befunden</Text>
         </>
       }
       footer={
         items.length > 0 && (
           <>
-            <span className={styles.footerHint}>Nach dem Senden warten diese Felder auf Rückmeldung.</span>
+            <Text variant="muted">Nach dem Senden warten diese Felder auf Rückmeldung.</Text>
             <span className={styles.footerActions}>
               <Button variant="secondary" icon="copy">
                 Text kopieren
@@ -61,8 +63,8 @@ export function RequestBasket({ view }: RequestBasketProps) {
               {items.map((item) => (
                 <ListItem
                   key={item.field.id}
-                  leading={<span className={styles.number}>{item.number}</span>}
-                  title={<span className={styles.itemTitle}>{item.title}</span>}
+                  leading={<Badge tone="neutral">{item.number}</Badge>}
+                  title={<Text variant="strong">{item.title}</Text>}
                   description={item.text}
                   meta={`Feld ${item.field.label}`}
                   trailing={<Button variant="ghost" icon="x" label="Position entfernen" />}

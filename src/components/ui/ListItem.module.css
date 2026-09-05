@@ -21,13 +21,13 @@
 .leading {
   display: flex;
   flex: none;
-  padding-top: 2px;
+  padding-top: var(--gap-hairline);
   color: var(--color-text-muted);
 }
 .body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--gap-hairline);
   min-width: 0;
 }
 .title {

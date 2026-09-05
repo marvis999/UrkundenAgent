@@ -4,11 +4,13 @@ import { Button, type ButtonVariant } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
+import { Text } from "@/components/ui/Text";
 import { TopBar, UserChip } from "@/components/ui/TopBar";
 import { workspace } from "@/data/workspace";
 import { deriveBanner, type ActionEmphasis } from "@/domain/derive";
 import type { CaseView } from "@/domain/model";
 import { CASE_STATUS_META } from "@/domain/status";
+import { formatFiles } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import styles from "./CaseChrome.module.css";
 
@@ -33,7 +35,7 @@ export function CaseChrome({ view, children }: CaseChromeProps) {
     { label: "Urkundendaten", detail: `${view.fields.length} Felder`, href: routes.case(c.id) },
     {
       label: "Unterlagen",
-      detail: `${view.documents.length} Dateien`,
+      detail: formatFiles(view.documents.length),
       badge: c.phase === "intake" && newDocuments > 0 ? `${newDocuments} neu` : undefined,
       href: routes.caseDocuments(c.id),
     },
@@ -47,7 +49,7 @@ export function CaseChrome({ view, children }: CaseChromeProps) {
           <>
             <Button variant="ghost" icon="arrow-left" href={routes.cases()} label="Zur Vorgangsliste" />
             <span className={styles.name}>{c.name}</span>
-            <span className={styles.fileNumber}>{c.fileNumber}</span>
+            <Text variant="muted">{c.fileNumber}</Text>
             <StatusBadge meta={CASE_STATUS_META[c.status]} />
           </>
         }
@@ -69,6 +71,7 @@ export function CaseChrome({ view, children }: CaseChromeProps) {
           title={banner.title}
           text={banner.text}
           size="prominent"
+          attached
           actions={
             <>
               {banner.secondary && (

@@ -1,12 +1,11 @@
 import { Button } from "@/components/ui/Button";
 import { FormField } from "@/components/ui/FormField";
 import { Notice } from "@/components/ui/Notice";
-import { Columns, Page, Stack } from "@/components/ui/Page";
+import { Columns, Page, Stack } from "@/components/ui/layout";
 import { PageTitle } from "@/components/ui/PageTitle";
-import { BrandMark, TopBar, UserChip } from "@/components/ui/TopBar";
+import { Brand, TopBar, UserChip } from "@/components/ui/TopBar";
 import { workspace } from "@/data/workspace";
 import { routes } from "@/lib/routes";
-import styles from "../../page.module.css";
 
 const EMAIL_ROWS = 14;
 
@@ -17,8 +16,7 @@ export default function NewCasePage() {
         start={
           <>
             <Button variant="ghost" icon="arrow-left" href={routes.cases()} label="Zur Vorgangsliste" />
-            <BrandMark />
-            <span className={styles.product}>{workspace.productName}</span>
+            <Brand name={workspace.productName} />
           </>
         }
         end={<UserChip initials={workspace.userInitials} />}

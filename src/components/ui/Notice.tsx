@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Tone } from "@/domain/tone";
-import { Icon } from "./Icon";
 import type { IconName } from "./icons";
+import { TonedIcon } from "./TonedIcon";
 import styles from "./Notice.module.css";
 
 interface NoticeProps {
@@ -16,19 +16,21 @@ interface NoticeProps {
   size?: "compact" | "regular" | "prominent";
   /** solid = tone background, tint = light tone background, plain = neutral surface, white = card on a grey block. */
   surface?: "solid" | "tint" | "plain" | "white";
+  /** Continues the element above it (the active tab): no top-left radius. */
+  attached?: boolean;
 }
 
 /**
  * Icon, title, text, actions in a tinted box. Serves as status banner, finding card,
  * draft stamp, info note, empty state and upload zone. One implementation, sized by props.
  */
-export function Notice({ tone, icon, title, text, actions, children, size = "regular", surface = "solid" }: NoticeProps) {
+export function Notice({ tone, icon, title, text, actions, children, size = "regular", surface = "solid", attached = false }: NoticeProps) {
   return (
-    <section className={[styles.notice, styles[size], styles[surface]].join(" ")} data-tone={tone}>
+    <section className={[styles.notice, styles[size], styles[surface], attached ? styles.attached : ""].join(" ")} data-tone={tone}>
       <div className={styles.row}>
         {icon && (
           <span className={styles.icon}>
-            <Icon name={icon} size={size === "prominent" ? "xl" : "md"} />
+            <TonedIcon tone={tone} name={icon} size={size === "prominent" ? "xl" : "md"} />
           </span>
         )}
         <div className={styles.body}>

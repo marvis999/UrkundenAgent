@@ -1,25 +1,4 @@
-.icon {
+.kind {
   display: flex;
   color: var(--color-text-secondary);
-}
-.muted {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-.run {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-sunken);
-}
-.runHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.outcomeIcon {
-  display: flex;
-  color: var(--tone-fg);
 }

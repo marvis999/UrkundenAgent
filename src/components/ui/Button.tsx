@@ -12,13 +12,15 @@ interface ButtonProps {
   icon?: IconName;
   iconEnd?: IconName;
   href?: string;
+  /** Client-side action. Ignored when href is given. */
+  onClick?: () => void;
   disabled?: boolean;
   /** Required when there is no visible text. */
   label?: string;
   children?: ReactNode;
 }
 
-export function Button({ variant = "secondary", icon, iconEnd, href, disabled, label, children }: ButtonProps) {
+export function Button({ variant = "secondary", icon, iconEnd, href, onClick, disabled, label, children }: ButtonProps) {
   const className = [styles.button, styles[variant], children ? "" : styles.iconOnly].join(" ");
   const content = (
     <>
@@ -35,7 +37,7 @@ export function Button({ variant = "secondary", icon, iconEnd, href, disabled, l
     );
   }
   return (
-    <button type="button" className={className} disabled={disabled} aria-label={label}>
+    <button type="button" className={className} onClick={onClick} disabled={disabled} aria-label={label}>
       {content}
     </button>
   );

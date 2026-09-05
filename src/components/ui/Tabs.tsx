@@ -18,7 +18,11 @@ interface TabsProps {
 
 export function Tabs({ items }: TabsProps) {
   const pathname = usePathname();
-  const active = [...items].sort((a, b) => b.href.length - a.href.length).find((item) => pathname.startsWith(item.href));
+  // The most specific tab whose href prefixes the current path (sub-routes belong to their tab).
+  const active = items.reduce<TabItem | undefined>(
+    (best, item) => (pathname.startsWith(item.href) && item.href.length > (best?.href.length ?? 0) ? item : best),
+    undefined,
+  );
   return (
     <nav className={styles.tabs} aria-label="Reiter">
       {items.map((item) => (

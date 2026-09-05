@@ -1,7 +1,7 @@
 .body {
   padding: var(--space-5);
 }
-.footerActions {
+.actions {
   display: flex;
   gap: var(--space-2);
 }

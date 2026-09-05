@@ -1,19 +1,28 @@
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
-import type { Tone } from "@/domain/tone";
+import type { ReactNode } from "react";
+import { cssVars } from "@/lib/css";
 import { Disclosure } from "./Disclosure";
 import styles from "./Table.module.css";
+
+/** Grid tracks shared by several column configurations. */
+export const TRACK = {
+  fill: "minmax(0, 1fr)",
+  status: "150px",
+  narrow: "120px",
+} as const;
 
 export interface Column<Row> {
   id: string;
   header?: string;
-  /** A grid track, e.g. "minmax(0, 1fr)" or "150px". */
+  /** A grid track, e.g. TRACK.fill or "90px". */
   width: string;
   align?: "start" | "end";
   render: (row: Row) => ReactNode;
 }
 
 export interface RowDetail {
+  /** Stable DOM id for the expandable row, unique on the page. */
+  id: string;
   content: ReactNode;
   open: boolean;
   /** URLs mirrored into the address bar when the row opens or closes. */
@@ -29,8 +38,6 @@ interface TableProps<Row> {
   rowHref?: (row: Row) => string | undefined;
   /** Makes the row an animated disclosure with the detail underneath, spanning all columns. */
   rowDetail?: (row: Row) => RowDetail;
-  /** Tints the row with the tone. */
-  rowTone?: (row: Row) => Tone | undefined;
   showHeader?: boolean;
   density?: "compact" | "regular";
   emptyText?: string;
@@ -39,9 +46,9 @@ interface TableProps<Row> {
 /**
  * Grid-based row list with optional expandable rows. Case list, document list, subfield rows,
  * parcel and encumbrance tables and the draft clause list are all column configurations of it.
+ * Rows stay neutral; status is carried by the badge in the row, never by the row background.
  */
-export function Table<Row>({ columns, rows, rowKey, rowHref, rowDetail, rowTone, showHeader = false, density = "regular", emptyText }: TableProps<Row>) {
-  const style = { "--table-columns": columns.map((c) => c.width).join(" ") } as CSSProperties;
+export function Table<Row>({ columns, rows, rowKey, rowHref, rowDetail, showHeader = false, density = "regular", emptyText }: TableProps<Row>) {
   const cellClass = (column: Column<Row>) => [styles.cell, column.align === "end" ? styles.end : ""].join(" ");
   const cells = (row: Row) =>
     columns.map((column) => (
@@ -51,7 +58,7 @@ export function Table<Row>({ columns, rows, rowKey, rowHref, rowDetail, rowTone,
     ));
 
   return (
-    <div className={[styles.table, styles[density]].join(" ")} style={style} role="table">
+    <div className={[styles.table, styles[density]].join(" ")} style={cssVars({ "--table-columns": columns.map((c) => c.width).join(" ") })} role="table">
       {showHeader && (
         <div className={[styles.row, styles.header].join(" ")} role="row">
           {columns.map((column) => (
@@ -64,14 +71,13 @@ export function Table<Row>({ columns, rows, rowKey, rowHref, rowDetail, rowTone,
       {rows.length === 0 && emptyText && <div className={styles.empty}>{emptyText}</div>}
       {rows.map((row) => {
         const key = rowKey(row);
-        const tone = rowTone?.(row);
         const detail = rowDetail?.(row);
         if (detail) {
           return (
             <Disclosure
               key={key}
+              id={detail.id}
               defaultOpen={detail.open}
-              tone={tone}
               openHref={detail.openHref}
               closedHref={detail.closedHref}
               className={styles.group}
@@ -85,7 +91,7 @@ export function Table<Row>({ columns, rows, rowKey, rowHref, rowDetail, rowTone,
         const href = rowHref?.(row);
         const className = [styles.row, styles.body, href ? styles.link : ""].join(" ");
         return (
-          <div key={key} className={styles.group} data-tone={tone}>
+          <div key={key} className={styles.group}>
             {href ? (
               <Link href={href} className={className} role="row">
                 {cells(row)}

@@ -4,13 +4,13 @@
 
 /* dots */
 .dots {
-  gap: 3px;
+  gap: var(--gap-rows);
   align-items: center;
 }
 .dots .page {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-sm);
   background: var(--color-surface-hover);
 }
 .dots .done {
@@ -43,7 +43,7 @@
   display: block;
   width: var(--thumb-width);
   aspect-ratio: var(--paper-ratio);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   box-shadow: inset 0 0 0 var(--hairline) var(--color-border);
 }

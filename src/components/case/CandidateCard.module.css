@@ -29,10 +29,6 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.source {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
 .tags {
   display: flex;
   flex: none;
@@ -46,17 +42,13 @@
   border-radius: var(--radius);
   background: var(--color-surface-muted);
   color: var(--color-text-secondary);
-  line-height: 1.6;
+  line-height: var(--leading-loose);
 }
 
 .image {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-.hint {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 .readings {
   display: flex;
@@ -65,11 +57,6 @@
   padding: var(--space-3);
   border-radius: var(--radius);
   background: var(--color-surface-muted);
-}
-.question {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
 }
 
 .actions {

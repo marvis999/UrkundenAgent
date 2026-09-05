@@ -1,4 +1,8 @@
-import type { CaseView, Field } from "./model";
+import type { CaseView, Field, RequestTemplate } from "./model";
+
+type RequestableField = Field & { request: RequestTemplate };
+
+const isRequestable = (field: Field): field is RequestableField => field.request !== undefined;
 
 export interface BasketItem {
   number: number;
@@ -10,8 +14,8 @@ export interface BasketItem {
 export const basketItems = (view: CaseView): BasketItem[] =>
   view.basket
     .flatMap((id) => view.fields.filter((f) => f.id === id))
-    .filter((field) => field.request !== undefined)
-    .map((field, index) => ({ number: index + 1, field, title: field.request!.title, text: field.request!.text }));
+    .filter(isRequestable)
+    .map((field, index) => ({ number: index + 1, field, title: field.request.title, text: field.request.text }));
 
 export const requestSubject = (view: CaseView) => `${view.case.fileNumber}, ${view.case.property}: fehlende Unterlagen`;
 

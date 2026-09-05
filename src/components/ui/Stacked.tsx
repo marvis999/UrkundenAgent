@@ -11,7 +11,7 @@ interface StackedProps {
 export function Stacked({ title, subtitle, emphasis = "regular" }: StackedProps) {
   return (
     <span className={styles.stacked}>
-      <span className={emphasis === "strong" ? styles.strong : undefined}>{title}</span>
+      <span className={[styles.title, emphasis === "strong" ? styles.strong : ""].join(" ")}>{title}</span>
       {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
     </span>
   );

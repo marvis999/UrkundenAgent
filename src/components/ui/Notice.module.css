@@ -2,6 +2,9 @@
   border-radius: var(--radius);
   color: var(--color-ink);
 }
+.attached {
+  border-top-left-radius: 0;
+}
 .solid {
   background: var(--tone-bg);
 }
@@ -34,8 +37,7 @@
 .icon {
   display: flex;
   flex: none;
-  color: var(--tone-fg);
-  padding-top: 1px;
+  padding-top: var(--optical-nudge);
 }
 .prominent .icon {
   padding-top: 0;

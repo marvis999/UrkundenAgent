@@ -1,5 +1,5 @@
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Stack } from "@/components/ui/Page";
+import { Stack } from "@/components/ui/layout";
 import type { CaseView, FieldId } from "@/domain/model";
 import { FieldRow } from "./FieldRow";
 
@@ -7,11 +7,10 @@ interface FieldListProps {
   view: CaseView;
   activeFieldId?: FieldId;
   activePartId?: string;
-  showManualForm?: boolean;
 }
 
 /** Fields grouped in contract order. The active field is expanded. */
-export function FieldList({ view, activeFieldId, activePartId, showManualForm }: FieldListProps) {
+export function FieldList({ view, activeFieldId, activePartId }: FieldListProps) {
   return (
     <Stack gap="loose">
       {view.groups.map((group) => (
@@ -21,16 +20,7 @@ export function FieldList({ view, activeFieldId, activePartId, showManualForm }:
             .flatMap((id) => view.fields.filter((f) => f.id === id))
             .map((field) => {
               const expanded = field.id === activeFieldId;
-              return (
-                <FieldRow
-                  key={field.id}
-                  view={view}
-                  field={field}
-                  expanded={expanded}
-                  activePartId={expanded ? activePartId : undefined}
-                  showManualForm={expanded && showManualForm}
-                />
-              );
+              return <FieldRow key={field.id} view={view} field={field} expanded={expanded} activePartId={expanded ? activePartId : undefined} />;
             })}
         </Stack>
       ))}

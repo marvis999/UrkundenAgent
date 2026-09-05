@@ -1,0 +1,5 @@
+.icon {
+  display: flex;
+  flex: none;
+  color: var(--tone-fg);
+}

@@ -27,7 +27,7 @@
 
 .chevron {
   display: flex;
-  padding-top: 1px;
+  padding-top: var(--optical-nudge);
   color: var(--color-text-secondary);
   transition: transform var(--duration-expand) var(--easing-standard);
 }

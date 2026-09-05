@@ -30,8 +30,6 @@ export const parseFieldId = (value: string | string[] | undefined): FieldId | un
 
 export const parseString = (value: string | string[] | undefined) => first(value);
 
-export const parseFlag = (value: string | string[] | undefined) => first(value) !== undefined;
-
 export const parsePage = (value: string | string[] | undefined, fallback = 1) => {
   const parsed = Number.parseInt(first(value) ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;

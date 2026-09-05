@@ -35,13 +35,13 @@ export const defaultPartId = (field: Field): string | undefined => {
   return (parts.find((p) => p.finding && hasFinding(p.status)) ?? parts.find((p) => isOpen(p.status)) ?? parts[0])?.id;
 };
 
-export const targetsPart = (candidate: Candidate, target: CandidateTarget) =>
-  candidate.target.kind === target.kind &&
-  (candidate.target.kind === "subfield"
-    ? candidate.target.subfieldId === (target as { subfieldId: string }).subfieldId
-    : candidate.target.rowId === (target as { rowId: string }).rowId);
+/** Stable string form of a target, so two targets compare with one equality check. */
+const targetKey = (t: CandidateTarget) => (t.kind === "subfield" ? `subfield:${t.subfieldId}` : `row:${t.rowId}`);
 
-export const candidatesFor = (field: Field, target: CandidateTarget) => field.candidates.filter((c) => targetsPart(c, target));
+export const candidatesFor = (field: Field, target: CandidateTarget): Candidate[] => {
+  const key = targetKey(target);
+  return field.candidates.filter((c) => targetKey(c.target) === key);
+};
 
 export const hasEvidence = (field: Field, target: CandidateTarget) => candidatesFor(field, target).length > 0;
 

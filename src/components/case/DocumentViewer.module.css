@@ -1,13 +1,3 @@
-.pager {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-.footerHint {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 .layout {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -16,7 +6,7 @@
   background: var(--color-surface-muted);
 }
 .thumbs {
-  max-height: 70vh;
+  max-height: var(--viewer-thumbs-max-height);
   overflow-y: auto;
 }
 .stage {
@@ -42,28 +32,21 @@
 .sheetHeader {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-.sheetTitle {
-  font-weight: 600;
-}
-.sheetSubtitle {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  gap: var(--gap-hairline);
 }
 .lines {
-  height: 72px;
+  height: var(--faux-block);
   background: repeating-linear-gradient(
     to bottom,
     var(--color-surface-hover) 0,
-    var(--color-surface-hover) 6px,
-    transparent 6px,
-    transparent 18px
+    var(--color-surface-hover) var(--faux-line),
+    transparent var(--faux-line),
+    transparent var(--faux-pitch)
   );
   mask-image: linear-gradient(to right, black 0, black 80%, transparent 100%);
 }
 .short {
-  height: 36px;
+  height: calc(var(--faux-block) / 2);
   width: 60%;
 }
 .hit {

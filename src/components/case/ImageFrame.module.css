@@ -14,17 +14,17 @@
   margin: 0 auto;
 }
 
-/* Faux handwriting lines until the real image is wired in. */
+/* Faux handwriting lines until the real image is wired in. Percentages shape the placeholder only. */
 .paper {
   position: absolute;
   inset: -16% -7%;
-  transform: rotate(-1.7deg);
+  transform: rotate(var(--faux-tilt));
   background: repeating-linear-gradient(
     to bottom,
     var(--color-paper-ink) 0,
-    var(--color-paper-ink) 6px,
-    transparent 6px,
-    transparent 22px
+    var(--color-paper-ink) var(--faux-line),
+    transparent var(--faux-line),
+    transparent var(--faux-pitch)
   );
   background-clip: content-box;
   padding: 26% 30%;
@@ -37,9 +37,9 @@
   top: var(--crop-y);
   width: var(--crop-w);
   height: var(--crop-h);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--color-marker-fill);
-  box-shadow: inset 0 0 0 2px var(--color-accent);
+  box-shadow: inset 0 0 0 var(--marker-width) var(--color-accent);
 }
 
 .caption {
@@ -50,7 +50,7 @@
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   background: var(--color-overlay-pill);
   color: var(--color-on-dark);
   font-size: var(--text-xs);

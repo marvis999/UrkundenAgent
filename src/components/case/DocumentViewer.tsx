@@ -4,6 +4,7 @@ import { Notice } from "@/components/ui/Notice";
 import { Overlay } from "@/components/ui/Overlay";
 import { PageIndicators, type PageIndicator } from "@/components/ui/PageIndicators";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Text } from "@/components/ui/Text";
 import { candidateOnPage, clampPage, pagesWithEvidence } from "@/domain/evidence";
 import type { CaseView, Document } from "@/domain/model";
 import { DOCUMENT_KIND_ICON, DOCUMENT_STATUS_META } from "@/domain/status";
@@ -45,9 +46,9 @@ export function DocumentViewer({ view, document, page: requestedPage }: Document
       headerEnd={
         <>
           <Button variant="ghost" icon="chevron-left" href={pageHref(page - 1)} disabled={page === 1} label="Vorherige Seite" />
-          <span className={styles.pager}>
+          <Text variant="muted">
             Seite {page} von {document.pageCount}
-          </span>
+          </Text>
           <Button variant="ghost" icon="chevron-right" href={pageHref(page + 1)} disabled={page === document.pageCount} label="Nächste Seite" />
         </>
       }
@@ -57,9 +58,9 @@ export function DocumentViewer({ view, document, page: requestedPage }: Document
             <Button variant="accent" icon="check">
               Fundstelle übernehmen
             </Button>
-            <span className={styles.footerHint}>
+            <Text variant="muted">
               {located.field.label}: {located.candidate.value}
-            </span>
+            </Text>
           </>
         )
       }
@@ -77,8 +78,8 @@ export function DocumentViewer({ view, document, page: requestedPage }: Document
           ) : (
             <div className={styles.sheet}>
               <div className={styles.sheetHeader}>
-                <span className={styles.sheetTitle}>{document.title}</span>
-                <span className={styles.sheetSubtitle}>{document.subtitle}</span>
+                <Text variant="strong">{document.title}</Text>
+                <Text variant="muted">{document.subtitle}</Text>
               </div>
               <div className={styles.lines} />
               {located?.candidate.quote && (
