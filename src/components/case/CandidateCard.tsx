@@ -18,12 +18,14 @@ interface CandidateCardProps {
   candidate: Candidate;
   /** Whether the value this candidate feeds has been confirmed by a human. */
   confirmed: boolean;
+  /** The rendered page this candidate cites, once the original has been imported. */
+  pageSrc?: string;
 }
 
 const REDACTED_VALUE = "unlesbar gemacht";
 
 /** One Fundstelle. Several of these stand side by side with equal rank; only a human picks. */
-export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed }: CandidateCardProps) {
+export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed, pageSrc }: CandidateCardProps) {
   // A manual correction or a derived value has no document behind it; its origin is its reason.
   const documentHref = candidate.documentId === undefined ? undefined : routes.document(caseId, candidate.documentId, candidate.page);
   const activeLabel = confirmed ? "im Feld, bestätigt" : "im Feld, nicht bestätigt";
@@ -53,6 +55,7 @@ export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed }:
       {candidate.image && (
         <div className={styles.image}>
           <ImageFrame
+            src={pageSrc}
             crop={candidate.image.crop}
             caption={candidate.image.caption}
             size="inline"
@@ -64,7 +67,7 @@ export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed }:
               )
             }
           />
-          <Text variant="muted">{candidate.image.hint}</Text>
+          {candidate.image.hint && <Text variant="muted">{candidate.image.hint}</Text>}
           {candidate.image.readings && (
             <div className={styles.readings}>
               {candidate.image.question && <Text variant="label">{candidate.image.question}</Text>}

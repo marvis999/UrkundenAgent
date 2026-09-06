@@ -19,6 +19,8 @@ document       (id, case_id, file_name, storage_path, hash, doc_type, kind, doc_
                 page_count, source_class, quality, status, title, subtitle,
                 photo_caption, photo_hint, received_in_run, sort_order)
                                                              -- UNIQUE (case_id, hash)
+page           (id, document_id, number, image_path, width, height, text)
+                                                             -- UNIQUE (document_id, number)
 field          (id, case_id, key, label, group_key, sort_order, kind, no_request_reason)
                                                              -- kind: values | table
 subfield       (id, field_id, key, label, sort_order, value_type,
@@ -53,6 +55,32 @@ den Export.
 `document.hash` ist der SHA-256 der Datei. Ein erneuter Upload derselben Datei legt kein zweites
 Dokument an. `storage_path` zeigt relativ in das Datenverzeichnis; die Datei selbst liegt nie
 im Repository und nie unter `public/`.
+
+### Seiten
+
+Beim Einspielen wird jede Datei mit MuPDF (WebAssembly, kein nativer Baustein) seitenweise
+gerendert: ein PNG je Seite unter `<hash>.pages/` neben dem Original, dazu die Textebene in
+`page.text`. Leerer Text heißt Scan oder Foto, also eine Seite, die das Sichtmodell braucht.
+Ein Durchlauf bekommt Seiten einzeln; `candidate.page` zeigt auf genau eine davon.
+`POST /api/cases/<id>/documents/<dok>/pages` rendert nach, etwa nach einem Wechsel des Renderers.
+
+### Vom Zitat zur Fundstelle
+
+Das Modell bekommt den Seitentext und wird nie nach Koordinaten gefragt. Es liefert den Wert
+und das Zitat, aus dem der Wert stammt; das Zitat wird danach in genau demselben Text gesucht,
+den es gelesen hat. Seitentext und Zeichenpositionen entstehen in einem Durchgang, damit
+zwischen "was das Modell gelesen hat" und "worauf die Markierung zeigt" nichts auseinanderlaufen
+kann. Gefunden wird auch, was das Modell unterwegs ändert: Groß- und Kleinschreibung,
+zusammengefasste Leerzeichen, ein Zeilenumbruch mitten im Satz, ein am Zeilenende getrenntes Wort.
+
+Aus dem Treffer wird `candidate.crop`. Zwei Fälle bekommen bewusst keine Markierung:
+
+- Das Zitat steht nicht auf der genannten Seite. Dann wurde der Wert dort nicht abgelesen,
+  und das ist ein Prüfsignal, kein Darstellungsproblem.
+- Das Zitat kommt auf der Seite mehrfach vor. Dann legt es keine Stelle fest.
+
+Reine Scans haben keine Textebene, also auch kein Zitat zum Suchen. Dort bleibt es vorerst bei
+der Seite als Fundstelle.
 
 ### Der Feldkatalog steht im Code
 
@@ -177,8 +205,8 @@ Dies ist die Feldliste aus der Aufgabe.
 ## Offen
 
 - Tabellenzellen bekommen eigene Kandidaten; `table_row.status` entfällt dann.
-- Seitentexte aus OCR sind noch nicht modelliert; die Seitenansicht zeigt bislang einen
-  Platzhalter. Eine `page`-Tabelle kommt mit dem Durchlauf, der sie befüllt.
+- `page.text` ist die Textebene der Datei, kein OCR. Für reine Scans bleibt sie leer, bis
+  ein Durchlauf das Bild gelesen hat.
 - Ein abgeleiteter Wert wird beim Wechsel der Quelle entfernt, aber noch nicht neu erzeugt.
   Das gehört in den nächsten Durchlauf.
 - Das Schema wird beim Start angelegt, nicht migriert. Sobald es Daten gibt, die eine

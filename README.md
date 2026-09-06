@@ -50,7 +50,8 @@ npm run import -- 2026-0412 pfad/zu/den/unterlagen/*.pdf pfad/zu/den/unterlagen/
 Das Skript sendet die Dateien an die laufende Anwendung. Diese legt sie unter
 `<datenverzeichnis>/dokumente/<vorgang>/<sha256>.<endung>` ab und verknüpft sie mit dem
 passenden Dokumenteintrag. Derselbe Inhalt wird nur einmal gespeichert, ein zweiter Import
-legt kein zweites Dokument an. Zum Schluss meldet das Skript, welche Unterlagen noch ohne
+legt kein zweites Dokument an. Jede Datei wird beim Einspielen seitenweise gerendert; die
+Seitenansicht zeigt danach die echten Seiten. Zum Schluss meldet das Skript, welche Unterlagen noch ohne
 Datei sind.
 
 In Docker liegen die Dateien im Volume `documents`, lokal unter `data/`. Beides steht in

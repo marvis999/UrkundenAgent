@@ -1,0 +1,194 @@
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { canRender, locateQuotes, renderPages } from "@/lib/pages";
+import { documentsDirectory, int, query, queryOne, text, textOrNull, transaction } from "./connect";
+
+/**
+ * Rendered pages of a document: one image and one text per page.
+ *
+ * Images live next to the original in the data directory, under `<hash>.pages/`, so a
+ * document's original and its pages travel together and are content-addressed the same
+ * way. The database holds the paths and the text; the text is what a later run reads
+ * before deciding whether a page needs the vision model at all.
+ */
+
+const PAGES_SUFFIX = ".pages";
+const IMAGE_EXTENSION = ".png";
+
+/** `<case>/<hash>.pages/<n>.png`, with forward slashes so the row works in the container. */
+const pagePath = (storagePath: string, number: number) => {
+  const original = path.posix.parse(storagePath);
+  return path.posix.join(original.dir, `${original.name}${PAGES_SUFFIX}`, `${number}${IMAGE_EXTENSION}`);
+};
+
+const contentTypeOf = (fileName: string): string => {
+  switch (path.extname(fileName).toLowerCase()) {
+    case ".pdf":
+      return "application/pdf";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    default:
+      return "application/octet-stream";
+  }
+};
+
+const findDocument = (caseId: string, documentKey: string) =>
+  queryOne(
+    "SELECT id, file_name, storage_path FROM document WHERE case_id = $1 AND (id = $2 OR id = $3)",
+    caseId,
+    documentKey,
+    `${caseId}:${documentKey}`,
+  );
+
+export interface RenderResult {
+  documentId: string;
+  pageCount: number;
+  /** Pages that carry a text layer; the rest are scans or photos. */
+  pagesWithText: number;
+  /** Quotes that were found on the page they name, and so carry a marked region. */
+  quotesLocated: number;
+  /** Quotes that were not found there. Each one is a value worth looking at again. */
+  quotesUnresolved: number;
+}
+
+/**
+ * Renders a stored document into page rows and page images. Rendering the same document
+ * again replaces its pages, so a re-render after a library upgrade is one call.
+ * Returns undefined when the document has no file yet or is of a kind that cannot be rendered.
+ */
+export const renderDocumentPages = async (caseId: string, documentKey: string): Promise<RenderResult | undefined> => {
+  const row = await findDocument(caseId, documentKey);
+  const storagePath = row === undefined ? null : textOrNull(row.storage_path);
+  if (row === undefined || storagePath === null) return undefined;
+
+  const contentType = contentTypeOf(text(row.file_name));
+  if (!canRender(contentType)) return undefined;
+
+  const documentId = text(row.id);
+  const bytes = await readFile(path.join(documentsDirectory(), storagePath));
+
+  // Pages are written to disk first; the rows follow in one transaction so a document
+  // never has half its pages in the database.
+  const rendered: { number: number; imagePath: string; width: number; height: number; text: string }[] = [];
+  for await (const page of renderPages(bytes, contentType)) {
+    const imagePath = pagePath(storagePath, page.number);
+    const absolute = path.join(documentsDirectory(), imagePath);
+    await mkdir(path.dirname(absolute), { recursive: true });
+    await writeFile(absolute, page.png);
+    rendered.push({ number: page.number, imagePath, width: page.width, height: page.height, text: page.text });
+  }
+
+  await transaction(async (client) => {
+    await client.query("DELETE FROM page WHERE document_id = $1", [documentId]);
+    for (const page of rendered) {
+      await client.query(
+        "INSERT INTO page (id, document_id, number, image_path, width, height, text) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [`${documentId}#${page.number}`, documentId, page.number, page.imagePath, page.width, page.height, page.text],
+      );
+    }
+    await client.query("UPDATE document SET page_count = $1 WHERE id = $2", [rendered.length, documentId]);
+  });
+
+  const quotes = await locateDocumentQuotes(caseId, documentId);
+  return {
+    documentId,
+    pageCount: rendered.length,
+    pagesWithText: rendered.filter((page) => page.text !== "").length,
+    ...quotes,
+  };
+};
+
+const FRACTION = 100;
+
+/**
+ * Turns the quotes a run recorded into marked regions on the page.
+ *
+ * The model is never asked where something sits, only what it read. The quote is then
+ * looked up in the same page text the model was given, which is what makes the marker
+ * verifiable: a quote that is not on the page it names did not come off that page, so no
+ * region is written and the value stands on its own.
+ *
+ * A quote that occurs several times on one page pins nothing, so it gets no region either.
+ */
+export const locateDocumentQuotes = async (
+  caseId: string,
+  documentKey: string,
+): Promise<{ quotesLocated: number; quotesUnresolved: number }> => {
+  const row = await findDocument(caseId, documentKey);
+  const storagePath = row === undefined ? null : textOrNull(row.storage_path);
+  if (row === undefined || storagePath === null) return { quotesLocated: 0, quotesUnresolved: 0 };
+
+  const documentId = text(row.id);
+  const candidates = await query(
+    `SELECT id, page, quote FROM candidate
+     WHERE document_id = $1 AND quote IS NOT NULL AND page IS NOT NULL AND crop IS NULL`,
+    documentId,
+  );
+  if (candidates.length === 0) return { quotesLocated: 0, quotesUnresolved: 0 };
+
+  const bytes = await readFile(path.join(documentsDirectory(), storagePath));
+  const located = await locateQuotes(
+    bytes,
+    contentTypeOf(text(row.file_name)),
+    candidates.map((candidate) => ({ page: int(candidate.page), quote: text(candidate.quote) })),
+  );
+
+  let quotesLocated = 0;
+  for (const [index, candidate] of candidates.entries()) {
+    const hit = located[index];
+    if (hit === undefined || hit.hits > 1) continue;
+    const { rect } = hit;
+    await query("UPDATE candidate SET crop = $1 WHERE id = $2", JSON.stringify({
+      x: rect.x / FRACTION,
+      y: rect.y / FRACTION,
+      w: rect.w / FRACTION,
+      h: rect.h / FRACTION,
+      caption: `Seite ${int(candidate.page)}`,
+      hint: "",
+      question: null,
+    }), text(candidate.id));
+    quotesLocated += 1;
+  }
+  return { quotesLocated, quotesUnresolved: candidates.length - quotesLocated };
+};
+
+export interface PageImage {
+  absolutePath: string;
+  size: number;
+  contentType: string;
+}
+
+/** Locates one rendered page image, or undefined while the document has not been rendered. */
+export const readPageImage = async (caseId: string, documentKey: string, number: number): Promise<PageImage | undefined> => {
+  const row = await queryOne(
+    `SELECT p.image_path FROM page p JOIN document d ON d.id = p.document_id
+     WHERE d.case_id = $1 AND (d.id = $2 OR d.id = $3) AND p.number = $4`,
+    caseId,
+    documentKey,
+    `${caseId}:${documentKey}`,
+    number,
+  );
+  if (row === undefined) return undefined;
+  const absolutePath = path.join(documentsDirectory(), text(row.image_path));
+  return { absolutePath, size: (await stat(absolutePath)).size, contentType: "image/png" };
+};
+
+export interface PageText {
+  number: number;
+  text: string;
+}
+
+/** The text layer of every rendered page, in order. Empty text marks a page that needs vision. */
+export const documentPageTexts = async (caseId: string, documentKey: string): Promise<PageText[]> =>
+  (
+    await query(
+      `SELECT p.number, p.text FROM page p JOIN document d ON d.id = p.document_id
+       WHERE d.case_id = $1 AND (d.id = $2 OR d.id = $3) ORDER BY p.number`,
+      caseId,
+      documentKey,
+      `${caseId}:${documentKey}`,
+    )
+  ).map((row) => ({ number: int(row.number), text: text(row.text) }));

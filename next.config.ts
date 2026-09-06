@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
    * .next/static/development. Set NEXT_DIST_DIR to verify a build while dev is running.
    */
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  /** MuPDF is WebAssembly loaded at runtime; bundling it would break its file lookup. */
+  serverExternalPackages: ["mupdf"],
+  /**
+   * Pin the trace root to this project. Without it Next walks up to the nearest other
+   * lockfile -- a checkout inside another repository, a worktree -- and nests the
+   * standalone output under that path, where the Dockerfile no longer finds server.js.
+   */
+  outputFileTracingRoot: process.cwd(),
 };
 
 export default nextConfig;
