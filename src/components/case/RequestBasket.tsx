@@ -13,9 +13,11 @@ import type { CaseView } from "@/domain/model";
 import { basketItems, requestLetter, requestSubject } from "@/domain/request";
 import { formatPositions } from "@/lib/format";
 import { routes } from "@/lib/routes";
+import { CopyText } from "./CopyText";
 import styles from "./RequestBasket.module.css";
 
 const LETTER_FORM = "request-letter";
+const LETTER_BODY = "request-letter-body";
 
 interface RequestBasketProps {
   view: CaseView;
@@ -48,12 +50,15 @@ export function RequestBasket({ view }: RequestBasketProps) {
               {sent ? "Diese Felder warten auf Rückmeldung." : "Nach dem Senden warten diese Felder auf Rückmeldung."}
             </Text>
             <span className={styles.footerActions}>
-              <Button variant="secondary" icon="copy">
-                Text kopieren
-              </Button>
-              <Button variant="accent" icon={sent ? "mail" : "send"} form={sent ? undefined : LETTER_FORM} disabled={sent}>
-                {sent ? "Nachfassen" : "Senden"}
-              </Button>
+              <CopyText targetId={LETTER_BODY} label="Text kopieren" />
+              {/* Once sent, the drawer is the record of what went out. Sending again is a
+                  different letter, and the app does not write that one -- copying the text
+                  into a mail client is what a follow-up actually is here. */}
+              {!sent && (
+                <Button variant="accent" icon="send" form={LETTER_FORM}>
+                  Senden
+                </Button>
+              )}
             </span>
           </>
         )
@@ -98,7 +103,7 @@ export function RequestBasket({ view }: RequestBasketProps) {
                   <input name="subject" defaultValue={requestSubject(view)} readOnly={sent} />
                 </FormField>
                 <FormField label="Text" hint="aus den Positionen erzeugt, frei überschreibbar">
-                  <textarea name="body" rows={16} defaultValue={requestLetter(view, items)} readOnly={sent} />
+                  <textarea id={LETTER_BODY} name="body" rows={16} defaultValue={requestLetter(view, items)} readOnly={sent} />
                 </FormField>
               </Stack>
             </form>

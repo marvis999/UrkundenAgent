@@ -71,6 +71,12 @@ const setUp = async () => {
     await client.query("SELECT pg_advisory_lock($1)", [SETUP_LOCK]);
     try {
       await client.query(readFileSync(path.join(process.cwd(), SCHEMA_FILE), "utf8"));
+      // Imported here rather than at the top: this module is the one the writers import,
+      // and a cycle at load time would leave the pool half-built. The client is passed in
+      // because `query` would wait on the bootstrap this is part of.
+      const { releaseAbandonedRuns } = await import("./runWriter");
+      const freed = await releaseAbandonedRuns(client);
+      if (freed > 0) console.log(`${freed} Vorgang/Vorgänge aus einem abgebrochenen Durchlauf befreit.`);
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [SETUP_LOCK]);
     }

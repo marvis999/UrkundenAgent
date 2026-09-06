@@ -1,3 +1,5 @@
+import { chooseCandidateAction } from "@/app/actions";
+import { ActionForm } from "@/components/ui/ActionForm";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Notice } from "@/components/ui/Notice";
@@ -59,9 +61,13 @@ export function DocumentViewer({ view, document, page: requestedPage, text: page
       footer={
         located && (
           <>
-            <Button variant="accent" icon="check">
-              Fundstelle übernehmen
-            </Button>
+            {/* The same act as choosing the candidate on its card, from the other side:
+                here you are looking at the page and deciding the value it carries. */}
+            <ActionForm action={chooseCandidateAction} values={{ case: caseId, candidate: located.candidate.id }}>
+              <Button variant="accent" icon="check" submit disabled={located.candidate.isActive}>
+                {located.candidate.isActive ? "Im Feld" : "Fundstelle übernehmen"}
+              </Button>
+            </ActionForm>
             <Text variant="muted">
               {located.field.label}: {located.candidate.value}
             </Text>

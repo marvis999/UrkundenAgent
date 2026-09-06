@@ -176,6 +176,64 @@ export const chooseCandidate = (caseId: string, candidateId: string) =>
     await dropStaleDerived(client, caseId, run);
   });
 
+/**
+ * Picks one of the competing readings of a passage that was not read cleanly.
+ *
+ * This is the point of the `Lesung unsicher` status: the model says it cannot tell a 6
+ * from an 8, offers both, and a person looks at the scan and decides. The result is a
+ * manual candidate -- a person chose it -- that keeps the Fundstelle of the reading it
+ * came from, because the passage is still the source and the marker still points at it.
+ * Only a value the model actually offered can be chosen; anything else is a correction
+ * and goes through `correctSubfield`, where a reason is required.
+ */
+export const chooseReading = (caseId: string, candidateId: string, value: string) =>
+  mutate(caseId, async (client, run) => {
+    const row = await one(
+      client,
+      `SELECT c.*, s.id AS subfield_id_out, s.value_type, s.field_id
+       FROM candidate c JOIN subfield s ON s.id = c.subfield_id JOIN field f ON f.id = s.field_id
+       WHERE f.case_id = $1 AND c.id = $2`,
+      [caseId, candidateId],
+    );
+    if (!row) return;
+
+    const readings = (row.readings ?? []) as { value: string }[];
+    if (!readings.some((reading) => reading.value === value)) return;
+
+    const chosenId = randomUUID();
+    await client.query(
+      `INSERT INTO candidate (id, subfield_id, table_row_id, value, canonical_value, tag, document_id, page, quote,
+                              source_label, note, source_class, crop, rationale, run, created_by, created_at)
+       VALUES ($1, $2, NULL, $3, $4, 'manual', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      [
+        chosenId,
+        text(row.subfield_id_out),
+        value,
+        canonicalize(value, text(row.value_type) as ValueType),
+        textOrNull(row.document_id),
+        row.page ?? null,
+        textOrNull(row.quote),
+        text(row.source_label),
+        `Lesart gewählt von ${CLERK}`,
+        textOrNull(row.source_class),
+        row.crop ?? null,
+        `Lesart gewählt: ${value}`,
+        run,
+        CLERK,
+        nowIso(),
+      ],
+    );
+    await client.query("UPDATE subfield SET chosen_candidate_id = $1, absence_note = NULL WHERE id = $2", [
+      chosenId,
+      text(row.subfield_id_out),
+    ]);
+    await writeHistory(client, text(row.field_id), { subfieldId: text(row.subfield_id_out) }, run, {
+      actor: "user",
+      text: `Lesart gewählt: ${value}`,
+    });
+    await dropStaleDerived(client, caseId, run);
+  });
+
 /** Corrects a value by hand. The reason is mandatory: without a document, it is the source. */
 export const correctSubfield = (caseId: string, fieldKey: string, subfieldKey: string, value: string, reason: string) =>
   mutate(caseId, async (client, run) => {

@@ -97,13 +97,11 @@ const AWAITING_RUN = `
  * Called after every ingest and at the end of every run, which between them are the only
  * two moments at which the answer can change.
  */
-export const noteIntake = (caseId: string) =>
-  query(
-    `UPDATE case_file c SET phase = 'intake', changed_at = $2
-     WHERE c.id = $1 AND c.phase IN ('review', 'waiting') AND EXISTS (${AWAITING_RUN})`,
-    caseId,
-    nowIso(),
-  );
+const INTAKE = `
+  UPDATE case_file c SET phase = 'intake', changed_at = $2
+  WHERE c.id = $1 AND c.phase IN ('review', 'waiting') AND EXISTS (${AWAITING_RUN})`;
+
+export const noteIntake = (caseId: string) => query(INTAKE, caseId, nowIso());
 
 /**
  * Writes the address the run read off the documents, once.
@@ -154,6 +152,34 @@ export const finishRun = async (
   // A document that arrived while the run was reading was not in its plan, so the case
   // goes straight back to `eingang` rather than looking done with it lying there.
   await noteIntake(caseId);
+};
+
+const ABANDONED = "Durchlauf abgebrochen: Anwendung neu gestartet";
+
+/**
+ * Frees every case that was mid-run when the process died.
+ *
+ * A run lives only inside the process that started it -- the guard and the
+ * AbortController are held in memory -- so at start-up there is provably no run in
+ * flight, whatever the database says. Without this a container restart during a run
+ * leaves the case showing a progress strip that nothing will ever move, and the only way
+ * out is a clerk pressing Abbrechen on a run that is not running.
+ *
+ * Takes the client the bootstrap already holds rather than going through `query`, which
+ * would wait on the bootstrap that is calling it. The run rows stay unfinished, so their
+ * documents are read again rather than skipped.
+ */
+export const releaseAbandonedRuns = async (client: PoolClient): Promise<number> => {
+  const { rows } = await client.query<Row>(
+    "UPDATE case_file SET phase = 'review', changed_at = $1 WHERE phase = 'analysis' RETURNING id",
+    [nowIso()],
+  );
+  for (const row of rows) {
+    const caseId = text(row.id);
+    await client.query("UPDATE run SET summary = $2 WHERE case_id = $1 AND finished_at IS NULL", [caseId, ABANDONED]);
+    await client.query(INTAKE, [caseId, nowIso()]);
+  }
+  return rows.length;
 };
 
 /**

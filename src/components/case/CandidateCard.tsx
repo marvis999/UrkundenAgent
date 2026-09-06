@@ -1,4 +1,4 @@
-import { chooseCandidateAction, confirmValueAction } from "@/app/actions";
+import { chooseCandidateAction, chooseReadingAction, confirmValueAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -57,6 +57,7 @@ export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed, p
           <ImageFrame
             src={pageSrc}
             crop={candidate.image.crop}
+            {...(candidate.image.pageAspect === undefined ? {} : { pageAspect: candidate.image.pageAspect })}
             caption={candidate.image.caption}
             size="inline"
             action={
@@ -71,9 +72,13 @@ export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed, p
           {candidate.image.readings && (
             <div className={styles.readings}>
               {candidate.image.question && <Text variant="label">{candidate.image.question}</Text>}
+              {/* Choosing one is the whole point of `Lesung unsicher`: the model could not
+                  tell the characters apart, a person looks at the scan and decides. */}
               <OptionGroup
                 label="Lesarten"
                 options={candidate.image.readings.map((r) => ({ id: r.value, label: r.value, selected: r.value === candidate.value }))}
+                action={chooseReadingAction}
+                values={{ case: caseId, candidate: candidate.id }}
               />
             </div>
           )}

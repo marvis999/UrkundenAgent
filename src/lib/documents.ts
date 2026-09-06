@@ -27,6 +27,12 @@ const BY_EXTENSION: Readonly<Record<string, FileType>> = {
   ".jpg": { kind: "photo", contentType: "image/jpeg", form: "rendered" },
   ".jpeg": { kind: "photo", contentType: "image/jpeg", form: "rendered" },
   ".png": { kind: "photo", contentType: "image/png", form: "rendered" },
+  /*
+   * Taken as plain text, not decoded as MIME. A simple mail reads well that way and its
+   * headers are useful context, but an attachment or a base64 body reaches the model as
+   * the gibberish it is. Pasting the text through "Notiz oder E-Mail" is the reliable
+   * route; this one is a convenience with a known edge.
+   */
   ".eml": { kind: "email", contentType: "message/rfc822; charset=utf-8", form: "text" },
   ".txt": { kind: "note", contentType: "text/plain; charset=utf-8", form: "text" },
   ".md": { kind: "note", contentType: "text/plain; charset=utf-8", form: "text" },

@@ -6,7 +6,7 @@ import { cancelAnalysis, startAnalysis } from "@/agent/dispatch";
 import { PROCEDURES, type Procedure } from "@/domain/status";
 import { createCase } from "@/db/cases";
 import { ingestDocument } from "@/db/files";
-import { chooseCandidate, confirmValue, correctSubfield, sendRequest, setBasketItem, setProcedure } from "@/db/mutations";
+import { chooseCandidate, chooseReading, confirmValue, correctSubfield, sendRequest, setBasketItem, setProcedure } from "@/db/mutations";
 import { noteFileName } from "@/lib/documents";
 import { parseFieldId } from "@/lib/load";
 import { routes } from "@/lib/routes";
@@ -38,6 +38,12 @@ export async function confirmValueAction(form: FormData) {
 
 export async function chooseCandidateAction(form: FormData) {
   await chooseCandidate(value(form, "case"), value(form, "candidate"));
+  refresh();
+}
+
+/** The option group posts the chosen reading as `option`; only an offered one is taken. */
+export async function chooseReadingAction(form: FormData) {
+  await chooseReading(value(form, "case"), value(form, "candidate"), value(form, "option"));
   refresh();
 }
 
