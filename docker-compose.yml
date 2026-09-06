@@ -39,6 +39,20 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-urkunden}:${POSTGRES_PASSWORD:-urkunden}@db:5432/${POSTGRES_DB:-urkunden}
       URKUNDEN_DATA_DIR: /data
       TZ: Europe/Berlin
+      # Der Durchlauf läuft im Container, also braucht der Container den Schlüssel.
+      # Compose setzt die Werte aus .env ein; nicht Gesetztes bleibt leer, und leer
+      # heißt für die App "nicht gesetzt", nicht "auf leer gesetzt".
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
+      OPENROUTER_STRUCTURED_OUTPUTS: ${OPENROUTER_STRUCTURED_OUTPUTS:-}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-}
+      LLM_CACHE: ${LLM_CACHE:-}
+      # In das Volume, nicht ins Image: so überlebt der Antwort-Cache einen Neubau, und
+      # `docker compose down -v` löscht ihn zusammen mit den Unterlagen, über die er
+      # etwas weiß.
+      LLM_CACHE_DIR: ${LLM_CACHE_DIR:-/data/.llm-cache}
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:

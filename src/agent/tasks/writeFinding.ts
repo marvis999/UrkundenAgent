@@ -137,7 +137,14 @@ export const writeFinding = async (
       promptVersion: FINDING_PROMPT_VERSION,
       system: SYSTEM,
       parts,
-      maxTokens: 2_000,
+      /*
+       * The prose itself is a few hundred tokens, but a reasoning model bills its thinking
+       * against the same ceiling and spends most of it before writing a word. At 2000 every
+       * finding of a run came back truncated -- a field would then show `fehlt` with no
+       * sentence saying why, which is the one thing this agent exists to prevent. Kept in
+       * line with the other two stages rather than tuned to one model's appetite.
+       */
+      maxTokens: 8_000,
       temperature: 0,
     },
     FindingsSchema,

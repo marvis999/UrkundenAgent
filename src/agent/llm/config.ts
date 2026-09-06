@@ -62,7 +62,9 @@ export const readOpenRouterConfig = (env: Env = process.env): OpenRouterConfig =
     baseUrl: (env["OPENROUTER_BASE_URL"]?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, ""),
     model: env["OPENROUTER_MODEL"]?.trim() || DEFAULT_MODEL,
     strictStructuredOutputs: readBoolean(env["OPENROUTER_STRUCTURED_OUTPUTS"], true),
-    timeoutMs: readNumber(env["LLM_TIMEOUT_MS"], 120_000, "LLM_TIMEOUT_MS"),
+    // A reasoning model reading five scanned pages regularly needs more than two minutes,
+    // and a timeout there costs the whole field rather than delaying it.
+    timeoutMs: readNumber(env["LLM_TIMEOUT_MS"], 180_000, "LLM_TIMEOUT_MS"),
     maxRetries: readNumber(env["LLM_MAX_RETRIES"], 2, "LLM_MAX_RETRIES"),
     retryBaseDelayMs: readNumber(env["LLM_RETRY_BASE_MS"], 500, "LLM_RETRY_BASE_MS"),
     referer: env["OPENROUTER_REFERER"]?.trim() || "https://github.com/urkunden-agent",
