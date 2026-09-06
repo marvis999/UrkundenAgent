@@ -9,8 +9,7 @@
 
 import { pad } from "@/lib/clock";
 
-export const VALUE_TYPES = ["text", "amount", "date", "area", "register", "measure"] as const;
-export type ValueType = (typeof VALUE_TYPES)[number];
+export type ValueType = "text" | "amount" | "date" | "area" | "register" | "measure";
 
 const GERMAN_DATE = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/;
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;

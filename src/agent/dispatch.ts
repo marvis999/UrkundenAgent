@@ -2,7 +2,6 @@ import { createOpenRouterProvider, LlmError, type LlmProvider } from "./llm";
 import { planRun } from "./plan";
 import { runCase, RunCancelled } from "./run";
 import { endAnalysis, startRun } from "@/db/runWriter";
-import { plural } from "@/lib/format";
 
 /**
  * Starting and stopping a run from the browser.
@@ -28,15 +27,6 @@ import { plural } from "@/lib/format";
 
 const running = new Map<string, AbortController>();
 
-export interface StartResult {
-  readonly started: boolean;
-  /** German sentence for the clerk, when there was nothing to start. */
-  readonly reason?: string;
-  readonly runNumber?: number;
-}
-
-export const isAnalysing = (caseId: string) => running.has(caseId);
-
 /** What the run log says about a run that did not finish. A stop is not a fault. */
 const note = (error: unknown) =>
   error instanceof RunCancelled
@@ -60,21 +50,23 @@ const provider = (): LlmProvider | string => {
   }
 };
 
-export const startAnalysis = async (caseId: string): Promise<StartResult> => {
-  if (running.has(caseId)) return { started: false, reason: "Für diesen Vorgang läuft bereits ein Durchlauf." };
+/**
+ * Starts a run and comes straight back. Returns nothing when it started -- the case is in
+ * the analysis phase now and the page shows the progress strip -- or one German sentence
+ * saying why no run was started, which is the only outcome the pages cannot derive.
+ */
+export const startAnalysis = async (caseId: string): Promise<string | undefined> => {
+  if (running.has(caseId)) return "Für diesen Vorgang läuft bereits ein Durchlauf.";
 
   const model = provider();
-  if (typeof model === "string") return { started: false, reason: model };
+  if (typeof model === "string") return model;
 
   // Planned before anything is promised: a run over no documents would open a run row,
   // finish it empty and mark the case as read.
   const plan = await planRun(caseId);
   if (plan.documents.length === 0) {
     const skipped = plan.skipped.map((document) => `${document.fileName} (${document.reason})`).join(", ");
-    return {
-      started: false,
-      reason: skipped === "" ? "Keine ungelesenen Unterlagen im Vorgang." : `Nichts zu lesen: ${skipped}`,
-    };
+    return skipped === "" ? "Keine ungelesenen Unterlagen im Vorgang." : `Nichts zu lesen: ${skipped}`;
   }
 
   const controller = new AbortController();
@@ -89,12 +81,7 @@ export const startAnalysis = async (caseId: string): Promise<StartResult> => {
     .finally(() => {
       running.delete(caseId);
     });
-
-  return {
-    started: true,
-    runNumber: plan.number,
-    reason: `${plural(plan.documents.length, "Datei", "Dateien")}, ${plural(plan.pageCount, "Seite", "Seiten")}`,
-  };
+  return undefined;
 };
 
 /**

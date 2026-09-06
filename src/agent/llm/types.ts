@@ -1,13 +1,7 @@
 /**
- * The provider port.
- *
- * Deliberately tiny: text and images in, text out. Everything that makes an
- * extraction correct -- JSON validation, repair, caching, provenance -- lives
- * above this interface in `json.ts`, so it behaves identically no matter which
- * provider is plugged in.
- *
- * The port knows nothing about Urkunden. Domain knowledge belongs in the task
- * modules that build requests, never here.
+ * What goes into a model call and what comes back. Text and images in, text out;
+ * JSON validation, repair and caching live above this in `json.ts`. Nothing here knows
+ * about Urkunden -- domain knowledge belongs in the task modules that build requests.
  */
 
 export type JsonSchema = Record<string, unknown>;
@@ -32,7 +26,7 @@ export type PromptPart =
 export interface LlmRequest {
   /** Stable task name, e.g. "extractCandidates". Cache key, log label, and the name given to the response schema. */
   readonly task: string;
-  /** Bumped whenever the prompt changes. Part of the cache key; belongs in `run.prompt_version`. */
+  /** Bumped whenever the prompt changes. Part of the cache key. */
   readonly promptVersion: string;
   readonly system: string;
   readonly parts: readonly PromptPart[];
@@ -54,15 +48,6 @@ export interface LlmResult {
   /** Resolved model id, as reported by the provider. Belongs in `run.model`. */
   readonly model: string;
   readonly usage?: LlmUsage;
-  /** The provider envelope, kept for the call log. */
-  readonly raw: unknown;
-}
-
-export interface LlmProvider {
-  readonly id: string;
-  /** Configured model id. Part of the cache key, so a model swap cannot serve stale answers. */
-  readonly model: string;
-  complete(request: LlmRequest, signal?: AbortSignal): Promise<LlmResult>;
 }
 
 export class LlmError extends Error {

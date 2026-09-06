@@ -117,16 +117,11 @@ export async function createCaseAction(_previous: string | undefined, form: Form
 
 /* ---------- The run itself ---------- */
 
-/**
- * Starts a run and comes straight back. The answer is either nothing -- the case is in
- * the analysis phase now and the page will show the progress strip -- or one German
- * sentence saying why no run was started, which is the only outcome the pages cannot
- * derive from the case itself.
- */
+/** Undefined when the run started; otherwise the sentence saying why not. */
 export async function startRunAction(_previous: string | undefined, form: FormData): Promise<string | undefined> {
-  const result = await startAnalysis(value(form, "case"));
+  const refusal = await startAnalysis(value(form, "case"));
   refresh();
-  return result.started ? undefined : result.reason;
+  return refusal;
 }
 
 export async function cancelRunAction(form: FormData) {

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Tone } from "@/domain/tone";
+import type { Tone } from "@/domain/status";
 import { Icon } from "./Icon";
 import type { IconName } from "./icons";
 import styles from "./Badge.module.css";

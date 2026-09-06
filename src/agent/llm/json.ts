@@ -1,8 +1,9 @@
 import type { ZodType } from "zod";
 import { cacheKey, readCache, writeCache } from "./cache";
 import { readCacheConfig, type CacheConfig } from "./config";
+import type { LlmProvider } from "./providers/openRouter";
 import { toStrictJsonSchema } from "./schema";
-import { LlmError, LlmSchemaError, type LlmProvider, type LlmRequest, type LlmResult } from "./types";
+import { LlmError, LlmSchemaError, type LlmRequest, type LlmResult } from "./types";
 
 /**
  * Schema-validated calls.
@@ -61,8 +62,6 @@ const repairPrompt = (previous: string, issues: string) =>
 export interface CompleteJsonOptions {
   cache?: CacheConfig;
   signal?: AbortSignal;
-  /** One repair round-trip when the first answer fails validation. Default true. */
-  repair?: boolean;
 }
 
 export interface JsonCall<T> {
@@ -98,11 +97,8 @@ export const completeJson = async <T>(
     return { value: firstParsed.data, result: first, cached: false, attempts: 1 };
   }
 
+  // One repair round-trip, carrying the validation errors, before the call counts as failed.
   const issues = firstParsed.error ? formatIssues(firstParsed.error.issues) : "unparsable JSON";
-  if (options.repair === false) {
-    throw new LlmSchemaError(`${full.task}: the answer did not match the schema (${issues}).`, first.text, issues);
-  }
-
   const retry: LlmRequest = {
     ...full,
     parts: [...full.parts, { kind: "text", text: repairPrompt(first.text, issues) }],

@@ -45,7 +45,6 @@ export interface SkippedDocument {
 }
 
 export interface RunPlan {
-  readonly caseId: string;
   /** The run this plan belongs to. An unfinished run is resumed rather than duplicated. */
   readonly number: number;
   readonly documents: readonly PlannedDocument[];
@@ -99,20 +98,14 @@ export const planRun = async (caseId: string): Promise<RunPlan> => {
     ),
   ]);
 
-  const pagesByDocument = new Map<string, PlannedPage[]>();
-  for (const row of pageRows) {
-    const documentId = text(row.document_id);
-    const pages = pagesByDocument.get(documentId) ?? [];
-    pages.push(toPage(row));
-    pagesByDocument.set(documentId, pages);
-  }
+  const pagesByDocument = Map.groupBy(pageRows, (row) => text(row.document_id));
 
   const documents: PlannedDocument[] = [];
   const skipped: SkippedDocument[] = [];
   for (const row of documentRows) {
     const id = text(row.id);
     const fileName = text(row.file_name);
-    const pages = pagesByDocument.get(id)?.filter(isReadable);
+    const pages = pagesByDocument.get(id)?.map(toPage).filter(isReadable);
     if (pages === undefined || pages.length === 0) {
       skipped.push({ fileName, reason: "keine lesbaren Seiten" });
       continue;
@@ -120,11 +113,5 @@ export const planRun = async (caseId: string): Promise<RunPlan> => {
     documents.push({ id, fileName, kind: textOrNull(row.kind) as DocumentKind, pages });
   }
 
-  return {
-    caseId,
-    number,
-    documents,
-    skipped,
-    pageCount: documents.reduce((sum, document) => sum + document.pages.length, 0),
-  };
+  return { number, documents, skipped, pageCount: documents.reduce((sum, document) => sum + document.pages.length, 0) };
 };

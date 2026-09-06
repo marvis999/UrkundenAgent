@@ -73,9 +73,7 @@ export type PageRouting = ReadonlyMap<number, readonly FieldId[]>;
 export interface ClassifyResult {
   readonly facts: DocumentFacts;
   readonly routing: PageRouting;
-  readonly roles: ReadonlyMap<number, string>;
   readonly cached: boolean;
-  readonly model: string;
 }
 
 const FIELD_LIST = FIELD_CATALOG.map((field) => `  ${field.key} — ${field.label}`).join("\n");
@@ -205,16 +203,13 @@ export const classifyDocument = async (
   // extraction looks at it. A page it invented is dropped the same way.
   const known = new Set(document.pages.map((page) => page.number));
   const routing = new Map<number, readonly FieldId[]>();
-  const roles = new Map<number, string>();
 
   let facts: DocumentFacts | undefined;
   let cached = true;
-  let model = provider.model;
 
   for (const [index, pages] of sections.entries()) {
     const call = await classifySection(provider, document, pages, index === 0, options);
     cached = cached && call.cached;
-    model = call.result.model;
 
     // The first section carries the title page, the issue date and the stamp, so it is
     // the one that describes the document. Later sections only contribute page roles.
@@ -233,12 +228,10 @@ export const classifyDocument = async (
       };
     }
     for (const page of call.value.pages) {
-      if (!known.has(page.number)) continue;
-      routing.set(page.number, page.fieldKeys);
-      roles.set(page.number, page.role);
+      if (known.has(page.number)) routing.set(page.number, page.fieldKeys);
     }
   }
 
   if (facts === undefined) throw new Error(`${document.fileName}: keine Seiten zu klassifizieren.`);
-  return { facts, routing, roles, cached, model };
+  return { facts, routing, cached };
 };

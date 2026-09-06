@@ -1,13 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { readOpenRouterConfig, type OpenRouterConfig } from "../config";
-import {
-  LlmTransportError,
-  LlmTruncatedError,
-  type LlmProvider,
-  type LlmRequest,
-  type LlmResult,
-  type LlmUsage,
-} from "../types";
+import { LlmTransportError, LlmTruncatedError, type LlmRequest, type LlmResult, type LlmUsage } from "../types";
 
 /**
  * OpenRouter provider.
@@ -19,6 +12,10 @@ import {
  */
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
+
+/** OpenRouter attribution headers. */
+const REFERER = "https://github.com/urkunden-agent";
+const TITLE = "Urkunden-Zuarbeit";
 
 interface TextContent {
   type: "text";
@@ -149,7 +146,7 @@ export interface OpenRouterProviderOptions {
   fetchImpl?: FetchLike;
 }
 
-export const createOpenRouterProvider = (options: OpenRouterProviderOptions = {}): LlmProvider => {
+export const createOpenRouterProvider = (options: OpenRouterProviderOptions = {}) => {
   if (typeof window !== "undefined") {
     throw new LlmTransportError("The OpenRouter provider is server-only; the API key must never reach a browser.", undefined, false);
   }
@@ -163,8 +160,8 @@ export const createOpenRouterProvider = (options: OpenRouterProviderOptions = {}
       headers: {
         Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": config.referer,
-        "X-Title": config.title,
+        "HTTP-Referer": REFERER,
+        "X-Title": TITLE,
       },
       body: JSON.stringify(body),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
@@ -240,12 +237,14 @@ export const createOpenRouterProvider = (options: OpenRouterProviderOptions = {}
         text,
         model: typeof raw["model"] === "string" ? raw["model"] : config.model,
         usage: readUsage(raw["usage"]),
-        raw,
       };
     }
 
     throw lastError ?? new LlmTransportError("OpenRouter request failed.", undefined, false);
   };
 
-  return { id: "openrouter", model: config.model, complete };
+  /** `model` is part of the cache key, so a model swap cannot serve stale answers. */
+  return { model: config.model, complete };
 };
+
+export type LlmProvider = ReturnType<typeof createOpenRouterProvider>;

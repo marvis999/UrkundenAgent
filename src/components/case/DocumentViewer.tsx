@@ -30,7 +30,7 @@ export function DocumentViewer({ view, document, page: requestedPage, text: page
   const located = candidateOnPage(view, document.id, page);
   const isPhoto = document.kind === "photo";
   const pageHref = (n: number) => routes.document(caseId, document.id, clampPage(n, document.pageCount));
-  // Once the original is rendered, every kind shows its real page; the faux sheet is for descriptions only.
+  // A rendered page is shown as its image; a text document has none and shows its text.
   const pageSrc = document.hasPages ? routes.pageImage(caseId, document.id, page) : undefined;
 
   const thumbnails: PageIndicator[] = Array.from({ length: document.pageCount }, (_, i) => {
@@ -80,7 +80,7 @@ export function DocumentViewer({ view, document, page: requestedPage, text: page
           <PageIndicators pages={thumbnails} variant="thumbnails" paper={isPhoto ? "photo" : "text"} />
         </div>
         <div className={styles.stage}>
-          {isPhoto || pageSrc ? (
+          {pageSrc ? (
             <div className={styles.photo}>
               <ImageFrame src={pageSrc} crop={located?.candidate.image?.crop} caption={document.photoNote?.caption ?? document.type} size="page" />
               {document.photoNote && <Notice tone="neutral" icon="scan-text" text={document.photoNote.hint} size="compact" surface="white" />}
@@ -91,13 +91,9 @@ export function DocumentViewer({ view, document, page: requestedPage, text: page
                 <Text variant="strong">{document.title || document.fileName}</Text>
                 <Text variant="muted">{document.subtitle}</Text>
               </div>
-              {/* A note is shown as what it is. Everything else has no page to show yet. */}
+              {/* A note is shown as what it is. A file the renderer could not open has nothing to show. */}
               {pageText === undefined ? (
-                <>
-                  <div className={styles.lines} />
-                  <div className={styles.lines} />
-                  <div className={[styles.lines, styles.short].join(" ")} />
-                </>
+                <Notice tone="neutral" icon="scan-text" text="Seiten nicht gerendert." size="compact" surface="white" />
               ) : (
                 <p className={styles.text}>{pageText}</p>
               )}

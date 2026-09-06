@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
-import { documentFiles, ingestDocument } from "@/db/files";
+import { ingestDocument } from "@/db/files";
 import { queryOne } from "@/db/connect";
 
 /**
- * Import endpoint for the original documents.
- *
- * The originals are confidential and are never committed, so a fresh checkout starts with
- * descriptions and no files. Posting the files here fills them in; see the README and
- * scripts/import-documents.mjs.
+ * Import endpoint for the original documents: the upload zone and the import script both
+ * post here. The originals are confidential and are never committed.
  */
 
 const caseExists = async (caseId: string) =>
   (await queryOne("SELECT id FROM case_file WHERE id = $1", caseId)) !== undefined;
-
-export async function GET(_request: Request, { params }: { params: Promise<{ caseId: string }> }) {
-  const { caseId } = await params;
-  if (!(await caseExists(caseId))) return NextResponse.json({ error: "Vorgang nicht gefunden" }, { status: 404 });
-  return NextResponse.json({ documents: await documentFiles(caseId) });
-}
 
 export async function POST(request: Request, { params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;

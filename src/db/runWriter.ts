@@ -8,7 +8,8 @@ import type { FieldId } from "@/domain/model";
 import { REQUEST_OUTCOME_META, type RequestOutcome } from "@/domain/status";
 import { nowIso } from "@/lib/clock";
 import { formatRun } from "@/lib/format";
-import { int, query, queryOne, text, textOrNull, transaction, type Row } from "./connect";
+import { int, one, query, queryOne, text, textOrNull, transaction, type Row } from "./connect";
+import { writeHistory } from "./mutations";
 
 /**
  * Everything a run writes.
@@ -26,26 +27,6 @@ import { int, query, queryOne, text, textOrNull, transaction, type Row } from ".
  * Candidate ids are derived from content, so every insert is `ON CONFLICT DO NOTHING`
  * and a run that is repeated after a crash produces no duplicates.
  */
-
-const AGENT = "agent";
-
-const one = async (client: PoolClient, sql: string, parameters: unknown[]): Promise<Row | undefined> => {
-  const { rows } = await client.query<Row>(sql, parameters);
-  return rows[0];
-};
-
-const writeHistory = (
-  client: PoolClient,
-  fieldId: string,
-  owner: { subfieldId?: string | null; tableRowId?: string | null },
-  run: number,
-  message: string,
-) =>
-  client.query(
-    `INSERT INTO history (id, field_id, subfield_id, table_row_id, run, written_at, actor, text)
-     VALUES ($1, $2, $3, $4, $5, $6, 'agent', $7)`,
-    [randomUUID(), fieldId, owner.subfieldId ?? null, owner.tableRowId ?? null, run, nowIso(), message],
-  );
 
 /* ---------- The run row ---------- */
 
@@ -122,8 +103,8 @@ export const startRun = async (caseId: string, number: number): Promise<string> 
   transaction(async (client) => {
     const runId = `${caseId}:run-${number}`;
     await client.query(
-      `INSERT INTO run (id, case_id, number, started_at, finished_at, pages_read, summary)
-       VALUES ($1, $2, $3, $4, NULL, 0, '')
+      `INSERT INTO run (id, case_id, number, started_at, finished_at, summary)
+       VALUES ($1, $2, $3, $4, NULL, '')
        ON CONFLICT (case_id, number) DO UPDATE SET started_at = EXCLUDED.started_at, finished_at = NULL`,
       [runId, caseId, number, nowIso()],
     );
@@ -135,18 +116,9 @@ export const startRun = async (caseId: string, number: number): Promise<string> 
     return runId;
   });
 
-export const finishRun = async (
-  runId: string,
-  caseId: string,
-  summary: string,
-  provenance: { model: string | null; promptVersion: string | null },
-) => {
+export const finishRun = async (runId: string, caseId: string, summary: string) => {
   await transaction(async (client) => {
-    const pages = await one(client, "SELECT COALESCE(SUM(pages_read), 0) AS total FROM run_document WHERE run_id = $1", [runId]);
-    await client.query(
-      "UPDATE run SET finished_at = $1, pages_read = $2, summary = $3, model = $4, prompt_version = $5 WHERE id = $6",
-      [nowIso(), int(pages?.total), summary, provenance.model, provenance.promptVersion, runId],
-    );
+    await client.query("UPDATE run SET finished_at = $1, summary = $2 WHERE id = $3", [nowIso(), summary, runId]);
     await client.query("UPDATE case_file SET phase = 'review', changed_at = $1 WHERE id = $2", [nowIso(), caseId]);
   });
   // A document that arrived while the run was reading was not in its plan, so the case
@@ -230,25 +202,21 @@ export const recordProgress = (runId: string, documentId: string, pagesRead: num
 /* ---------- What the classification learned ---------- */
 
 export const saveDocumentFacts = (documentId: string, facts: DocumentFacts) =>
-  transaction(async (client) => {
-    await client.query(
-      `UPDATE document SET doc_type = $1, doc_date = $2, source_class = $3, status = $4, quality = $5,
-                           title = $6, subtitle = $7, photo_caption = $8, photo_hint = $9
-       WHERE id = $10`,
-      [
-        facts.docType,
-        facts.docDate,
-        facts.sourceClass,
-        facts.status,
-        facts.quality,
-        facts.title,
-        facts.subtitle,
-        facts.photoCaption,
-        facts.photoHint,
-        documentId,
-      ],
-    );
-  });
+  query(
+    `UPDATE document SET doc_type = $1, doc_date = $2, source_class = $3, status = $4, quality = $5,
+                         title = $6, subtitle = $7, photo_caption = $8, photo_hint = $9
+     WHERE id = $10`,
+    facts.docType,
+    facts.docDate,
+    facts.sourceClass,
+    facts.status,
+    facts.quality,
+    facts.title,
+    facts.subtitle,
+    facts.photoCaption,
+    facts.photoHint,
+    documentId,
+  );
 
 /* ---------- Candidates ---------- */
 
@@ -315,8 +283,8 @@ const ensureRow = async (
 const CANDIDATE_INSERT = `
   INSERT INTO candidate (id, subfield_id, table_row_id, value, canonical_value, tag, document_id, page, quote,
                          source_label, note, source_class, crop, confidence, readings, rationale,
-                         source_candidate_id, run, created_by, created_at)
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL, $17, 'agent', $18)
+                         source_candidate_id, run, created_at)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL, $17, $18)
   ON CONFLICT (id) DO NOTHING`;
 
 /**
@@ -416,7 +384,7 @@ export const saveCandidates = (
       if ((rowCount ?? 0) > 0) {
         subfieldsFilled += 1;
         const others = candidates.length > 1 ? `, ${candidates.length - 1} weitere Fundstelle(n)` : "";
-        await writeHistory(client, targets.fieldId, { subfieldId }, run, `aus ${preferred.sourceLabel} vorgeschlagen${others}`);
+        await writeHistory(client, targets.fieldId, { subfieldId }, run, "agent", `aus ${preferred.sourceLabel} vorgeschlagen${others}`);
       }
     }
 
@@ -457,13 +425,15 @@ export const saveFindings = (caseId: string, run: number, fieldKey: FieldId, fin
     for (const finding of findings.findings) {
       const subfieldId = targets.subfieldIds.get(finding.subfieldKey);
       if (subfieldId === undefined) continue;
-      // One live finding per subfield: the previous run's wording is replaced, not stacked.
-      await client.query("DELETE FROM finding WHERE subfield_id = $1 AND resolved_in_run IS NULL", [subfieldId]);
-      await client.query(
-        `INSERT INTO finding (id, field_id, subfield_id, table_row_id, title, text, created_in_run)
-         VALUES ($1, $2, $3, NULL, $4, $5, $6)`,
-        [randomUUID(), targets.fieldId, subfieldId, finding.title, finding.text, run],
-      );
+      // One finding per subfield: the previous run's wording is replaced, not stacked.
+      await client.query("DELETE FROM finding WHERE subfield_id = $1", [subfieldId]);
+      await client.query("INSERT INTO finding (id, field_id, subfield_id, title, text) VALUES ($1, $2, $3, $4, $5)", [
+        randomUUID(),
+        targets.fieldId,
+        subfieldId,
+        finding.title,
+        finding.text,
+      ]);
     }
   });
 
@@ -494,8 +464,8 @@ export const saveDerived = (caseId: string, run: number, derivation: DerivationW
     const id = `d-${derivation.sourceCandidateId}-${derivation.targetSubfieldKey}`;
     const { rowCount } = await client.query(
       `INSERT INTO candidate (id, subfield_id, table_row_id, value, canonical_value, tag, source_label,
-                              rationale, source_candidate_id, run, created_by, created_at)
-       VALUES ($1, $2, NULL, $3, $4, 'derived', $5, $6, $7, $8, 'agent', $9)
+                              rationale, source_candidate_id, run, created_at)
+       VALUES ($1, $2, NULL, $3, $4, 'derived', $5, $6, $7, $8, $9)
        ON CONFLICT (id) DO NOTHING`,
       [
         id,
@@ -516,7 +486,7 @@ export const saveDerived = (caseId: string, run: number, derivation: DerivationW
       [id, subfieldId],
     );
     if ((rowCount ?? 0) > 0 && (updated.rowCount ?? 0) > 0) {
-      await writeHistory(client, targets.fieldId, { subfieldId }, run, `abgeleitet: ${derivation.value}`);
+      await writeHistory(client, targets.fieldId, { subfieldId }, run, "agent", `abgeleitet: ${derivation.value}`);
     }
   });
 
@@ -590,7 +560,7 @@ export const resolveRequestItems = async (caseId: string, run: number): Promise<
         resolvedBy,
         text(item.id),
       ]);
-      await writeHistory(client, fieldId, {}, run, `Anforderung ${REQUEST_OUTCOME_META[outcome].label}: ${resolvedBy}`);
+      await writeHistory(client, fieldId, {}, run, "agent", `Anforderung ${REQUEST_OUTCOME_META[outcome].label}: ${resolvedBy}`);
     });
     resolved.push({ fieldKey: text(item.field_key) as FieldId, outcome, resolvedBy });
   }

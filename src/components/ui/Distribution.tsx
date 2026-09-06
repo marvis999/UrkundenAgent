@@ -1,6 +1,6 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import type { OverviewCount } from "@/domain/derive";
-import { cssVars } from "@/lib/css";
 import { TonedIcon } from "./TonedIcon";
 import styles from "./Distribution.module.css";
 
@@ -16,7 +16,7 @@ export function Distribution({ counts, hrefFor }: DistributionProps) {
     <div className={styles.distribution}>
       <div className={styles.bar} role="img" aria-label={visible.map((c) => `${c.count} ${c.label}`).join(", ")}>
         {visible.map((c) => (
-          <span key={c.id} className={styles.segment} data-tone={c.tone} style={cssVars({ "--segment-weight": c.count })} />
+          <span key={c.id} className={styles.segment} data-tone={c.tone} style={{ "--segment-weight": c.count } as CSSProperties} />
         ))}
       </div>
       <div className={styles.legend}>

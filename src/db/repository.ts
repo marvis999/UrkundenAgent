@@ -1,6 +1,12 @@
 import { cache } from "react";
-import { CLAUSES, FIELD_GROUPS, fieldDefinition } from "@/catalog/fields";
-import { computeSubfieldStatus, type CandidateTag, type StatusCandidate, type StatusContext } from "@/domain/computeStatus";
+import { fieldDefinition } from "@/catalog/fields";
+import {
+  computeSubfieldStatus,
+  type CandidateTag,
+  type StatusCandidate,
+  type StatusContext,
+  type StatusSubfield,
+} from "@/domain/computeStatus";
 import { fieldStatus, isOpen } from "@/domain/derive";
 import type {
   Candidate,
@@ -73,7 +79,10 @@ const imageOf = (row: Row): ImageEvidence | undefined => {
   };
 };
 
-const toStatusCandidate = (row: Row): StatusCandidate => ({
+/* The two row shapes the status rules read. Shared with the run's review, so a run and a
+   page compute status from character-for-character the same input. */
+
+export const toStatusCandidate = (row: Row): StatusCandidate => ({
   id: text(row.id),
   value: textOrNull(row.value),
   canonicalValue: textOrNull(row.canonical_value),
@@ -81,6 +90,14 @@ const toStatusCandidate = (row: Row): StatusCandidate => ({
   documentId: textOrNull(row.document_id),
   confidence: numberOrNull(row.confidence),
   hasReadings: json<Reading[]>(row.readings) !== undefined,
+});
+
+export const toStatusSubfield = (row: Row): StatusSubfield => ({
+  chosenCandidateId: textOrNull(row.chosen_candidate_id),
+  confirmedCandidateId: textOrNull(row.confirmed_candidate_id),
+  staleAfterDays: intOrNull(row.stale_after_days),
+  staleWhenValueInPast: bool(row.stale_when_value_in_past),
+  confidenceThreshold: numberOrNull(row.confidence_threshold) ?? 1,
 });
 
 /** Adds `key: value` only when the column is set, so optional properties stay absent. */
@@ -147,21 +164,9 @@ const toRequestItem = (row: Row): RequestItem => ({
 
 /* ---------- Grouping ---------- */
 
-const groupBy = <T>(rows: readonly Row[], keyOf: (row: Row) => string | null, map: (row: Row) => T): Map<string, T[]> => {
-  const grouped = new Map<string, T[]>();
-  for (const row of rows) {
-    const key = keyOf(row);
-    if (key === null) continue;
-    const bucket = grouped.get(key);
-    if (bucket) bucket.push(map(row));
-    else grouped.set(key, [map(row)]);
-  }
-  return grouped;
-};
-
-const column = (name: string) => (row: Row) => textOrNull(row[name]);
-
-const identity = (row: Row) => row;
+/** `Map.groupBy`, with each row mapped on the way in. */
+const grouped = <T>(rows: readonly Row[], keyOf: (row: Row) => string, map: (row: Row) => T): Map<string, T[]> =>
+  new Map([...Map.groupBy(rows, keyOf)].map(([key, group]) => [key, group.map(map)]));
 
 /** Findings and history hang off a subfield, a table row or the field itself. */
 const ownerOf = (row: Row) => textOrNull(row.subfield_id) ?? textOrNull(row.table_row_id) ?? text(row.field_id);
@@ -204,18 +209,14 @@ const loadRows = async (caseId: string | null) => {
          WHERE ${byField} ORDER BY c.created_at, c.id`,
         caseId,
       ),
-      query(
-        `SELECT fi.* FROM finding fi JOIN field f ON f.id = fi.field_id
-         WHERE ${byField} AND fi.resolved_in_run IS NULL`,
-        caseId,
-      ),
+      query(`SELECT fi.* FROM finding fi JOIN field f ON f.id = fi.field_id WHERE ${byField}`, caseId),
       query(
         `SELECT h.* FROM history h JOIN field f ON f.id = h.field_id WHERE ${byField} ORDER BY h.run, h.written_at, h.id`,
         caseId,
       ),
       query(`SELECT * FROM request WHERE ${byCase} ORDER BY run`, caseId),
       query(
-        `SELECT i.*, r.case_id, r.run AS request_run, r.sent_at, f.key AS field_key
+        `SELECT i.*, r.case_id, r.run AS request_run, r.sent_at, r.recipient, f.key AS field_key
          FROM request_item i
          JOIN request r ON r.id = i.request_id
          JOIN field f ON f.id = i.field_id
@@ -277,17 +278,7 @@ const buildSubfields = (fieldRowId: string, context: CaseContext): BuiltSubfield
     const chosenId = textOrNull(row.chosen_candidate_id);
     if (rows.some((candidate) => int(candidate.run) > FIRST_RUN)) touchedByLaterRun = true;
 
-    const status = computeSubfieldStatus(
-      {
-        chosenCandidateId: chosenId,
-        confirmedCandidateId: textOrNull(row.confirmed_candidate_id),
-        staleAfterDays: intOrNull(row.stale_after_days),
-        staleWhenValueInPast: bool(row.stale_when_value_in_past),
-        confidenceThreshold: numberOrNull(row.confidence_threshold) ?? 1,
-      },
-      rows.map(toStatusCandidate),
-      context,
-    );
+    const status = computeSubfieldStatus(toStatusSubfield(row), rows.map(toStatusCandidate), context);
 
     const chosen = rows.find((candidate) => text(candidate.id) === chosenId);
     subfields.push({
@@ -440,12 +431,12 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
     today,
     documentDate: (id) => documentDates.get(id),
     documentKeys,
-    subfieldsByField: groupBy(forCase(rows.subfields), column("field_id"), identity),
-    rowsByField: groupBy(forCase(rows.tableRows), column("field_id"), identity),
-    candidatesBySubfield: groupBy(forCase(rows.candidates), column("subfield_id"), identity),
-    candidatesByRow: groupBy(forCase(rows.candidates), column("table_row_id"), identity),
-    findings: groupBy(rows.findings, ownerOf, toFinding),
-    history: groupBy(rows.history, ownerOf, toHistory),
+    subfieldsByField: Map.groupBy(forCase(rows.subfields), (row) => text(row.field_id)),
+    rowsByField: Map.groupBy(forCase(rows.tableRows), (row) => text(row.field_id)),
+    candidatesBySubfield: Map.groupBy(forCase(rows.candidates), (row) => text(row.subfield_id)),
+    candidatesByRow: Map.groupBy(forCase(rows.candidates), (row) => text(row.table_row_id)),
+    findings: grouped(rows.findings, ownerOf, toFinding),
+    history: grouped(rows.history, ownerOf, toHistory),
     requestedAt: new Map(openItems.map((row) => [text(row.field_key), formatTimestampDate(timestampOrNull(row.sent_at) ?? "")])),
   };
 
@@ -456,7 +447,7 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
   const documents = documentRows.map((row) => toDocument(row, caseId, lastFinishedRun, rendered.has(text(row.id))));
 
   // A request sent during run N is reconciled by run N + 1, which reports what it settled.
-  const resolvedByRun = groupBy(
+  const resolvedByRun = grouped(
     sentItems.filter((row) => textOrNull(row.outcome) !== null),
     (row) => String(int(row.request_run) + 1),
     toRequestItem,
@@ -488,14 +479,11 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
       nextRun,
     },
     fields,
-    groups: FIELD_GROUPS,
     documents,
     runs,
-    clauses: CLAUSES,
     basket,
     ...present("requestSentAt", sentAt === null ? null : formatTimestampDate(sentAt)),
-    recipient: text(caseRow.recipient_name),
-    recipientEmail: text(caseRow.recipient_email),
+    recipient: sentAt === null ? "" : text(openItems[0]?.recipient),
     ...(progress.length === 0
       ? {}
       : {

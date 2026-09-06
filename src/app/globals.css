@@ -5,7 +5,6 @@
   --color-text-muted: #5f6469;
   --color-text-faint: #82878b;
   --color-text-disabled: #9aa0a4;
-  --color-link: #14509b;
   --color-on-dark: #ffffff;
 
   /* Surfaces */
@@ -18,8 +17,6 @@
   --color-border-strong: #b3b8bb;
   --color-dark: #16181a;
   --color-dark-hover: #2a2e31;
-  --color-paper-photo: #ddd3bd;
-  --color-paper-ink: #5d5340;
   --color-backdrop: rgba(20, 22, 24, 0.34);
   --color-backdrop-strong: rgba(20, 22, 24, 0.4);
   --color-surface-translucent: rgba(255, 255, 255, 0.72);
@@ -89,7 +86,6 @@
   --outline-width: 1.5px;
   --marker-width: 2px;
   --focus-ring: 2px solid var(--color-accent);
-  --shadow-overlay: 0 24px 60px rgba(22, 24, 26, 0.25);
 
   /* Sizes */
   --control-height: 32px;
@@ -100,13 +96,6 @@
   --chevron-width: 18px;
   --thumb-width: 44px;
   --image-excerpt-height: 176px;
-  --paper-ratio: 1 / 1.41;
-
-  /* Placeholder artwork until real page rendering exists */
-  --faux-line: 6px;
-  --faux-pitch: 20px;
-  --faux-block: 72px;
-  --faux-tilt: -1.7deg;
 
   /* Stacking: overlays sit above page content wherever they are rendered in the tree. */
   --z-overlay: 50;

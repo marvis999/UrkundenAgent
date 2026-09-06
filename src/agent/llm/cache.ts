@@ -16,16 +16,13 @@ import type { LlmRequest, LlmResult } from "./types";
  * errors and degrades to a live call.
  */
 
-/** Deterministic JSON: object keys sorted, so key order cannot change the hash. */
-const canonical = (value: unknown): string => {
-  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`);
-  return `{${entries.join(",")}}`;
-};
+/** Deterministic JSON: object keys sorted at every level, so key order cannot change the hash. */
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_key, node: unknown) =>
+    node !== null && typeof node === "object" && !Array.isArray(node)
+      ? Object.fromEntries(Object.keys(node).sort().map((key) => [key, (node as Record<string, unknown>)[key]]))
+      : node,
+  );
 
 const sha256 = (input: string | Buffer) => createHash("sha256").update(input).digest("hex");
 

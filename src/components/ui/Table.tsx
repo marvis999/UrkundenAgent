@@ -1,6 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { cssVars } from "@/lib/css";
+import type { CSSProperties, ReactNode } from "react";
 import { Disclosure } from "./Disclosure";
 import styles from "./Table.module.css";
 
@@ -58,7 +57,7 @@ export function Table<Row>({ columns, rows, rowKey, rowHref, rowDetail, showHead
     ));
 
   return (
-    <div className={[styles.table, styles[density]].join(" ")} style={cssVars({ "--table-columns": columns.map((c) => c.width).join(" ") })} role="table">
+    <div className={[styles.table, styles[density]].join(" ")} style={{ "--table-columns": columns.map((c) => c.width).join(" ") } as CSSProperties} role="table">
       {showHeader && (
         <div className={[styles.row, styles.header].join(" ")} role="row">
           {columns.map((column) => (

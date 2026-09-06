@@ -42,7 +42,6 @@ const imagePart = (file: string): PromptPart => {
 
 const main = async () => {
   const provider = createOpenRouterProvider();
-  console.log(`provider : ${provider.id}`);
   console.log(`model    : ${provider.model}`);
 
   const parts: PromptPart[] = [

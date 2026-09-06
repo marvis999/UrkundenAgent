@@ -1,3 +1,4 @@
+import { FIELD_GROUPS } from "@/catalog/fields";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Stack } from "@/components/ui/layout";
 import type { CaseView, FieldId } from "@/domain/model";
@@ -13,7 +14,7 @@ interface FieldListProps {
 export function FieldList({ view, activeFieldId, activePartId }: FieldListProps) {
   return (
     <Stack gap="loose">
-      {view.groups.map((group) => (
+      {FIELD_GROUPS.map((group) => (
         <Stack key={group.id} gap="rows">
           <SectionHeading>{group.title}</SectionHeading>
           {group.fieldIds

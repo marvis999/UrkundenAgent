@@ -129,21 +129,3 @@ export const readDocumentFile = async (caseId: string, documentKey: string): Pro
     fileName,
   };
 };
-
-export interface DocumentFileInfo {
-  documentId: string;
-  fileName: string;
-  hasFile: boolean;
-  pageCount: number;
-}
-
-/** What the import script reports back: which descriptions still have no original. */
-export const documentFiles = async (caseId: string): Promise<DocumentFileInfo[]> =>
-  (await query("SELECT id, file_name, storage_path, page_count FROM document WHERE case_id = $1 ORDER BY file_name", caseId)).map(
-    (row) => ({
-      documentId: text(row.id),
-      fileName: text(row.file_name),
-      hasFile: textOrNull(row.storage_path) !== null,
-      pageCount: int(row.page_count),
-    }),
-  );

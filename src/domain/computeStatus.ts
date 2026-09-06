@@ -19,8 +19,7 @@ export interface StatusCandidate {
   hasReadings: boolean;
 }
 
-export const CANDIDATE_TAGS = ["extracted", "manual", "derived", "redacted"] as const;
-export type CandidateTag = (typeof CANDIDATE_TAGS)[number];
+export type CandidateTag = "extracted" | "manual" | "derived" | "redacted";
 
 export interface StatusSubfield {
   chosenCandidateId: string | null;

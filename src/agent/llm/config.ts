@@ -21,9 +21,6 @@ export interface OpenRouterConfig {
   maxRetries: number;
   /** Backoff base; the test suite sets this to 0. */
   retryBaseDelayMs: number;
-  /** OpenRouter attribution headers. */
-  referer: string;
-  title: string;
 }
 
 export interface CacheConfig {
@@ -67,8 +64,6 @@ export const readOpenRouterConfig = (env: Env = process.env): OpenRouterConfig =
     timeoutMs: readNumber(env["LLM_TIMEOUT_MS"], 180_000, "LLM_TIMEOUT_MS"),
     maxRetries: readNumber(env["LLM_MAX_RETRIES"], 2, "LLM_MAX_RETRIES"),
     retryBaseDelayMs: readNumber(env["LLM_RETRY_BASE_MS"], 500, "LLM_RETRY_BASE_MS"),
-    referer: env["OPENROUTER_REFERER"]?.trim() || "https://github.com/urkunden-agent",
-    title: env["OPENROUTER_TITLE"]?.trim() || "Urkunden-Zuarbeit",
   };
 };
 

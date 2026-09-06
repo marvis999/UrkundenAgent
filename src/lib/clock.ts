@@ -15,6 +15,3 @@ export const pad = (value: number) => String(value).padStart(2, "0");
 export const nowIso = () => new Date().toISOString();
 
 export const todayIso = (now = new Date()) => `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-
-/** Normalises any ISO form to UTC, so one column never mixes zoned and unzoned values. */
-export const toUtcIso = (isoTimestamp: string) => new Date(isoTimestamp).toISOString();

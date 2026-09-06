@@ -96,7 +96,6 @@ export interface ExtractResult {
   readonly offered: readonly OfferedPage[];
   readonly candidates: readonly RawCandidate[];
   readonly cached: boolean;
-  readonly model: string;
 }
 
 /* ---------- What a field looks like to the model ---------- */
@@ -239,7 +238,7 @@ export const extractCandidates = async (
     ]),
   ];
 
-  const { value, result, cached } = await completeJson(
+  const { value, cached } = await completeJson(
     provider,
     {
       task: "extractCandidates",
@@ -255,7 +254,7 @@ export const extractCandidates = async (
     { signal: options.signal },
   );
 
-  return { fieldKey, offered, candidates: value.candidates, cached, model: result.model };
+  return { fieldKey, offered, candidates: value.candidates, cached };
 };
 
 /** Splits the pages routed to one field into requests the model can hold at once. */

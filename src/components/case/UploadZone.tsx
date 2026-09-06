@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
 import { TonedIcon } from "@/components/ui/TonedIcon";
 import { Text } from "@/components/ui/Text";
-import type { Tone } from "@/domain/tone";
+import type { Tone } from "@/domain/status";
 import type { IconName } from "@/components/ui/icons";
 import { ACCEPTED_EXTENSIONS } from "@/lib/documents";
 import { plural } from "@/lib/format";

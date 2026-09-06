@@ -11,7 +11,7 @@ import { Stack } from "@/components/ui/layout";
 import { Text } from "@/components/ui/Text";
 import type { CaseView } from "@/domain/model";
 import { basketItems, requestLetter, requestSubject } from "@/domain/request";
-import { formatPositions } from "@/lib/format";
+import { plural } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { CopyText } from "./CopyText";
 import styles from "./RequestBasket.module.css";
@@ -39,7 +39,7 @@ export function RequestBasket({ view }: RequestBasketProps) {
           <Icon name="list-checks" size="lg" />
           <span>Anforderung</span>
           <Text variant="muted">
-            {formatPositions(items.length)} {sent ? `gesendet am ${view.requestSentAt}` : "aus den Befunden"}
+            {plural(items.length, "Position", "Positionen")} {sent ? `gesendet am ${view.requestSentAt}` : "aus den Befunden"}
           </Text>
         </>
       }
@@ -97,7 +97,7 @@ export function RequestBasket({ view }: RequestBasketProps) {
               <input type="hidden" name="case" value={view.case.id} />
               <Stack gap="regular">
                 <FormField label="Empfänger">
-                  <input name="recipient" defaultValue={view.recipientEmail} readOnly={sent} />
+                  <input name="recipient" defaultValue={view.recipient} readOnly={sent} />
                 </FormField>
                 <FormField label="Betreff">
                   <input name="subject" defaultValue={requestSubject(view)} readOnly={sent} />

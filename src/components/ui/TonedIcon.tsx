@@ -1,4 +1,4 @@
-import type { Tone } from "@/domain/tone";
+import type { Tone } from "@/domain/status";
 import { Icon, type IconSize } from "./Icon";
 import type { IconName } from "./icons";
 import styles from "./TonedIcon.module.css";

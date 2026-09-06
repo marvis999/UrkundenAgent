@@ -213,10 +213,8 @@ export interface Case {
 export interface CaseView {
   case: Case;
   fields: Field[];
-  groups: readonly FieldGroup[];
   documents: Document[];
   runs: Run[];
-  clauses: readonly Clause[];
   /**
    * Positions of the request currently in play: the draft basket if one is open,
    * otherwise the request that was sent and is still awaiting a reply.
@@ -224,8 +222,8 @@ export interface CaseView {
   basket: FieldId[];
   /** Set once that request has gone out. Until then the basket is still editable. */
   requestSentAt?: string;
+  /** Who that request went to; empty while it is still a basket. */
   recipient: string;
-  recipientEmail: string;
   /** Pages read per document while a run is in progress. */
   analysisProgress?: Record<string, number>;
 }

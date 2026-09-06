@@ -7,15 +7,12 @@ import { plural } from "@/lib/format";
  *
  * This is the authority, not the database. Every case is built from it when it is opened,
  * so the shape is identical everywhere and a subfield can be addressed by a stable key
- * across runs. Cases record the version they were opened with, so an older case keeps its
- * shape when the catalog grows.
+ * across runs.
  *
  * The request templates here state the general case: what this kind of field always needs
  * before it is usable. What *this* case is missing is written by a run, which overrides
  * them per field -- so nothing here may name a party, a date or an amount.
  */
-
-export const CATALOG_VERSION = "2026-09-01";
 
 export interface SubfieldDefinition {
   key: string;

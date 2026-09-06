@@ -54,20 +54,22 @@ export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed, p
 
       {candidate.image && (
         <div className={styles.image}>
-          <ImageFrame
-            src={pageSrc}
-            crop={candidate.image.crop}
-            {...(candidate.image.pageAspect === undefined ? {} : { pageAspect: candidate.image.pageAspect })}
-            caption={candidate.image.caption}
-            size="inline"
-            action={
-              documentHref && (
-                <Button variant="surface" icon="search" href={documentHref}>
-                  Ganzes Bild
-                </Button>
-              )
-            }
-          />
+          {pageSrc && (
+            <ImageFrame
+              src={pageSrc}
+              crop={candidate.image.crop}
+              {...(candidate.image.pageAspect === undefined ? {} : { pageAspect: candidate.image.pageAspect })}
+              caption={candidate.image.caption}
+              size="inline"
+              action={
+                documentHref && (
+                  <Button variant="surface" icon="search" href={documentHref}>
+                    Ganzes Bild
+                  </Button>
+                )
+              }
+            />
+          )}
           {candidate.image.hint && <Text variant="muted">{candidate.image.hint}</Text>}
           {candidate.image.readings && (
             <div className={styles.readings}>

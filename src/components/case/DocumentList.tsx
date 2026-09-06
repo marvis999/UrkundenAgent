@@ -7,10 +7,9 @@ import { Stacked } from "@/components/ui/Stacked";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Table, TRACK, type Column } from "@/components/ui/Table";
 import { Text } from "@/components/ui/Text";
-import { documentPageCount, photoCount } from "@/domain/evidence";
 import type { CaseView, Document } from "@/domain/model";
 import { DOCUMENT_KIND_ICON, DOCUMENT_STATUS_META } from "@/domain/status";
-import { formatFiles, formatPages, formatRun } from "@/lib/format";
+import { formatRun, plural } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { AddNote } from "./AddNote";
 import { AnalysisStrip } from "./AnalysisStrip";
@@ -39,7 +38,7 @@ const documentColumns: readonly Column<Document>[] = [
   },
   { id: "type", width: TRACK.fill, render: (d) => d.type },
   { id: "date", width: "100px", render: (d) => <Text variant="muted">{d.date}</Text> },
-  { id: "pages", width: "80px", render: (d) => <Text variant="muted">{formatPages(d.pageCount)}</Text> },
+  { id: "pages", width: "80px", render: (d) => <Text variant="muted">{plural(d.pageCount, "Seite", "Seiten")}</Text> },
   { id: "status", width: "auto", align: "end", render: (d) => <StatusBadge meta={DOCUMENT_STATUS_META[d.status]} /> },
   { id: "chevron", width: "auto", render: () => <span className={styles.kind}><Icon name="chevron-right" /></span> },
 ];
@@ -51,7 +50,9 @@ interface DocumentListProps {
 /** The Unterlagen tab: files, upload zone, run log. Where a run is started and watched. */
 export function DocumentList({ view }: DocumentListProps) {
   const { documents, runs } = view;
-  const summary = `${formatFiles(documents.length)}, ${formatPages(documentPageCount(documents))}, ${photoCount(documents)} davon Fotos`;
+  const pages = documents.reduce((sum, d) => sum + d.pageCount, 0);
+  const photos = documents.filter((d) => d.kind === "photo").length;
+  const summary = `${plural(documents.length, "Datei", "Dateien")}, ${plural(pages, "Seite", "Seiten")}, ${photos} davon Fotos`;
   const analysing = view.case.phase === "analysis";
   // Documents waiting for a run that has not finished. The button appears only when there
   // is something for it to read, so the tab never offers a run over nothing.

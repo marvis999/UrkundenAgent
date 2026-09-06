@@ -9,10 +9,16 @@ import { Text } from "@/components/ui/Text";
 import { Brand, TopBar, UserChip } from "@/components/ui/TopBar";
 import { listCases } from "@/db/repository";
 import { workspace } from "@/data/workspace";
-import { caseListSummary } from "@/domain/cases";
 import type { Case } from "@/domain/model";
-import { CASE_STATUS_META } from "@/domain/status";
+import { CASE_STATUSES, CASE_STATUS_META } from "@/domain/status";
 import { routes } from "@/lib/routes";
+
+/** "1 in Prüfung, 1 wartet auf Rückmeldung, 2 vollständig" from the list itself. */
+const caseListSummary = (cases: readonly Case[]) =>
+  CASE_STATUSES.map((status) => ({ status, count: cases.filter((c) => c.status === status).length }))
+    .filter(({ count }) => count > 0)
+    .map(({ status, count }) => `${count} ${CASE_STATUS_META[status].label}`)
+    .join(", ");
 
 const caseColumns: readonly Column<Case>[] = [
   { id: "name", width: TRACK.fill, render: (c) => <Stacked title={c.name} subtitle={c.property} emphasis="strong" /> },

@@ -43,6 +43,4 @@ const { imported } = await response.json();
 for (const item of imported) {
   console.log(`${item.attachedToExisting ? "schon vorhanden" : "neu angelegt"}  ${item.fileName}  (${item.pageCount} Seiten)`);
 }
-
-const { documents } = await fetch(endpoint).then((r) => r.json());
-console.log(`\n${documents.length} Unterlagen im Vorgang. Der nächste Durchlauf liest die neuen.`);
+console.log("\nDer nächste Durchlauf liest die neuen.");

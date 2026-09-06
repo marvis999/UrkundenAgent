@@ -20,8 +20,4 @@ export const pagesWithEvidence = (view: CaseView, documentId: string) =>
 export const documentById = (view: CaseView, documentId: string): Document | undefined =>
   view.documents.find((d) => d.id === documentId);
 
-export const documentPageCount = (documents: readonly Document[]) => documents.reduce((sum, d) => sum + d.pageCount, 0);
-
-export const photoCount = (documents: readonly Document[]) => documents.filter((d) => d.kind === "photo").length;
-
 export const clampPage = (page: number, pageCount: number) => Math.min(Math.max(page, 1), pageCount);

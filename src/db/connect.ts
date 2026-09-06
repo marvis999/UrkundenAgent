@@ -55,7 +55,7 @@ const createPool = () => {
   return pool;
 };
 
-export const getPool = (): Pool => (cache.appPool ??= createPool());
+const getPool = (): Pool => (cache.appPool ??= createPool());
 
 /**
  * Applies the schema once per process. An advisory lock makes it safe when several
@@ -146,6 +146,10 @@ export const query = (sql: string, ...parameters: Parameter[]): Promise<Row[]> =
 
 export const queryOne = async (sql: string, ...parameters: Parameter[]): Promise<Row | undefined> =>
   (await query(sql, ...parameters))[0];
+
+/** First row of a statement on a client already in hand, inside a transaction. */
+export const one = async (client: PoolClient, sql: string, parameters: unknown[]): Promise<Row | undefined> =>
+  (await client.query<Row>(sql, parameters)).rows[0];
 
 /* ---------- Narrowing columns ---------- */
 

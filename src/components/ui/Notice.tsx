@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Tone } from "@/domain/tone";
+import type { Tone } from "@/domain/status";
 import type { IconName } from "./icons";
 import { TonedIcon } from "./TonedIcon";
 import styles from "./Notice.module.css";

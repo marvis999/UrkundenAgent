@@ -3,10 +3,6 @@
   font-size: var(--text-sm);
   font-weight: 400;
 }
-.faint {
-  color: var(--color-text-faint);
-  font-size: var(--text-xs);
-}
 .strong {
   font-weight: 600;
 }
@@ -17,10 +13,6 @@
 .placeholder {
   color: var(--color-text-faint);
   font-style: italic;
-}
-.error {
-  color: var(--color-missing-fg);
-  font-size: var(--text-sm);
 }
 .mono {
   font-family: var(--font-mono), monospace;

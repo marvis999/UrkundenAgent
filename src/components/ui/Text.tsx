@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import styles from "./Text.module.css";
 
 /** The handful of inline text styles the UI needs, defined once. */
-export type TextVariant = "muted" | "faint" | "strong" | "label" | "placeholder" | "error" | "mono";
+export type TextVariant = "muted" | "strong" | "label" | "placeholder" | "mono";
 
 interface TextProps {
   variant: TextVariant;

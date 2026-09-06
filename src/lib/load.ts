@@ -21,16 +21,14 @@ export const loadDocument = async (view: CaseView, params: DocumentParams) => {
   return document;
 };
 
-const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+export const parseString = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
 export const parseFieldId = (value: string | string[] | undefined): FieldId | undefined => {
-  const raw = first(value);
+  const raw = parseString(value);
   return FIELD_IDS.find((id) => id === raw);
 };
 
-export const parseString = (value: string | string[] | undefined) => first(value);
-
 export const parsePage = (value: string | string[] | undefined, fallback = 1) => {
-  const parsed = Number.parseInt(first(value) ?? "", 10);
+  const parsed = Number.parseInt(parseString(value) ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 };

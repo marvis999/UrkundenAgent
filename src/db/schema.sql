@@ -17,9 +17,6 @@ CREATE TABLE IF NOT EXISTS case_file (
   property        text NOT NULL,
   phase           text NOT NULL,
   current_run     integer NOT NULL DEFAULT 0,
-  catalog_version text NOT NULL,
-  recipient_name  text NOT NULL,
-  recipient_email text NOT NULL,
   changed_at      timestamptz NOT NULL
 );
 
@@ -29,11 +26,7 @@ CREATE TABLE IF NOT EXISTS run (
   number         integer NOT NULL,
   started_at     timestamptz NOT NULL,
   finished_at    timestamptz,
-  pages_read     integer NOT NULL DEFAULT 0,
   summary        text NOT NULL DEFAULT '',
-  -- Provenance of the extraction, so an export can name what produced a value.
-  model          text,
-  prompt_version text,
   UNIQUE (case_id, number)
 );
 
@@ -128,8 +121,6 @@ CREATE TABLE IF NOT EXISTS subfield (
   -- The foreign keys are added further down: candidate does not exist yet here.
   chosen_candidate_id      text,
   confirmed_candidate_id   text,
-  confirmed_by             text,
-  confirmed_at             timestamptz,
   UNIQUE (field_id, key)
 );
 
@@ -179,7 +170,6 @@ CREATE TABLE IF NOT EXISTS candidate (
   -- For tag 'derived': the candidate this was computed from.
   source_candidate_id text REFERENCES candidate(id) ON DELETE CASCADE,
   run             integer NOT NULL,
-  created_by      text NOT NULL,
   created_at      timestamptz NOT NULL,
   -- A candidate writes into exactly one target.
   CHECK (num_nonnulls(subfield_id, table_row_id) = 1),
@@ -213,15 +203,13 @@ BEGIN
 END
 $$;
 
+-- One per subfield at most; the next run replaces the wording rather than stacking it.
 CREATE TABLE IF NOT EXISTS finding (
   id               text PRIMARY KEY,
   field_id         text NOT NULL REFERENCES field(id) ON DELETE CASCADE,
   subfield_id      text REFERENCES subfield(id) ON DELETE CASCADE,
-  table_row_id     text REFERENCES table_row(id) ON DELETE CASCADE,
   title            text NOT NULL,
-  text             text NOT NULL,
-  created_in_run   integer NOT NULL,
-  resolved_in_run  integer
+  text             text NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS history (
@@ -269,6 +257,14 @@ CREATE TABLE IF NOT EXISTS run_document (
   pages_read  integer NOT NULL DEFAULT 0,
   PRIMARY KEY (run_id, document_id)
 );
+
+-- Columns that were written and never read. Dropped idempotently, so a database from
+-- before loses them on the next start and a fresh one never has them.
+ALTER TABLE case_file DROP COLUMN IF EXISTS catalog_version, DROP COLUMN IF EXISTS recipient_name, DROP COLUMN IF EXISTS recipient_email;
+ALTER TABLE run       DROP COLUMN IF EXISTS pages_read, DROP COLUMN IF EXISTS model, DROP COLUMN IF EXISTS prompt_version;
+ALTER TABLE subfield  DROP COLUMN IF EXISTS confirmed_by, DROP COLUMN IF EXISTS confirmed_at;
+ALTER TABLE candidate DROP COLUMN IF EXISTS created_by;
+ALTER TABLE finding   DROP COLUMN IF EXISTS table_row_id, DROP COLUMN IF EXISTS created_in_run, DROP COLUMN IF EXISTS resolved_in_run;
 
 CREATE INDEX IF NOT EXISTS candidate_by_subfield ON candidate (subfield_id);
 CREATE INDEX IF NOT EXISTS candidate_by_row      ON candidate (table_row_id);

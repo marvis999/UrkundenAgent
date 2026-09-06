@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactStrictMode: true,
   /** Lets the Docker image ship only the modules the app actually imports. */
   output: "standalone",
   /**

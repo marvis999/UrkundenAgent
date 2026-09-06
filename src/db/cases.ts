@@ -1,4 +1,4 @@
-import { CATALOG_VERSION, FIELD_CATALOG, subfieldDefaults } from "@/catalog/fields";
+import { FIELD_CATALOG, subfieldDefaults } from "@/catalog/fields";
 import { nowIso, todayIso } from "@/lib/clock";
 import { int, query, transaction, type Row } from "./connect";
 
@@ -7,8 +7,7 @@ import { int, query, transaction, type Row } from "./connect";
  *
  * The catalog is the authority, so this is the one place a case gets its shape: every
  * field and subfield of the deed is written out at creation, empty, with the deadlines
- * and thresholds the catalog states. The case records the catalog version it was opened
- * with, so a later change to the catalog leaves older cases as they were.
+ * and thresholds the catalog states.
  *
  * Nothing about the property is asked for. A notary knows the file by its number and by
  * the address, and the address is in the documents -- so it is left empty and the first
@@ -30,10 +29,8 @@ const nextSequence = async (year: string): Promise<number> => {
 const writeCase = async (caseId: string, fileNumber: string, name: string) =>
   transaction(async (client) => {
     await client.query(
-      `INSERT INTO case_file (id, name, file_number, property, phase, current_run, catalog_version,
-                              recipient_name, recipient_email, changed_at)
-       VALUES ($1, $2, $3, '', 'review', 0, $4, '', '', $5)`,
-      [caseId, name, fileNumber, CATALOG_VERSION, nowIso()],
+      "INSERT INTO case_file (id, name, file_number, property, phase, current_run, changed_at) VALUES ($1, $2, $3, '', 'review', 0, $4)",
+      [caseId, name, fileNumber, nowIso()],
     );
 
     for (const [fieldIndex, definition] of FIELD_CATALOG.entries()) {

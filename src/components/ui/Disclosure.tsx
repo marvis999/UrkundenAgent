@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { Tone } from "@/domain/tone";
+import type { Tone } from "@/domain/status";
 import styles from "./Disclosure.module.css";
 
 interface DisclosureProps {

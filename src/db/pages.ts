@@ -44,11 +44,9 @@ export interface QuoteReport {
   quotesAmbiguous: number;
 }
 
-export interface RenderResult extends QuoteReport {
+export interface RenderResult {
   documentId: string;
   pageCount: number;
-  /** Pages that carry a text layer; the rest are scans or photos. */
-  pagesWithText: number;
 }
 
 const NO_QUOTES: QuoteReport = { quotesLocated: 0, quotesAmbiguous: 0 };
@@ -117,13 +115,7 @@ export const renderDocumentPages = async (caseId: string, documentKey: string): 
     await client.query("UPDATE document SET page_count = $1 WHERE id = $2", [rendered.length, documentId]);
   });
 
-  const quotes = await locateDocumentQuotes(caseId, documentId);
-  return {
-    documentId,
-    pageCount: rendered.length,
-    pagesWithText: rendered.filter((page) => page.text !== "").length,
-    ...quotes,
-  };
+  return { documentId, pageCount: rendered.length };
 };
 
 const FRACTION = 100;

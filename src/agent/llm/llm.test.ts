@@ -21,8 +21,6 @@ const config = (over: Partial<OpenRouterConfig> = {}): OpenRouterConfig => ({
   timeoutMs: 5_000,
   maxRetries: 2,
   retryBaseDelayMs: 0,
-  referer: "https://example.invalid",
-  title: "test",
   ...over,
 });
 
@@ -234,7 +232,7 @@ test("the attribution headers are sent", async () => {
   const sent = headers[0];
   assert.ok(sent);
   assert.equal(sent["Authorization"], "Bearer test-key");
-  assert.equal(sent["X-Title"], "test");
+  assert.equal(sent["X-Title"], "Urkunden-Zuarbeit");
 });
 
 /* ---------- completeJson ---------- */
@@ -292,11 +290,3 @@ test("two bad answers fail loudly and keep the raw text", async () => {
   );
 });
 
-test("repair can be switched off", async () => {
-  const cache = await tempCache();
-  const { fetchImpl, bodies } = recorder([json(completion('{"value":"x"}'))]);
-  const provider = createOpenRouterProvider({ config: config(), fetchImpl });
-
-  await assert.rejects(completeJson(provider, request(), Answer, { cache, repair: false }), LlmSchemaError);
-  assert.equal(bodies.length, 1);
-});

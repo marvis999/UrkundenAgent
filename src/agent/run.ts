@@ -1,12 +1,12 @@
 import { createOpenRouterProvider, type LlmProvider } from "./llm";
 import { failures, fulfilled, inParallel, DEFAULT_LIMIT } from "./parallel";
-import { planRun, type PlannedDocument, type RunPlan } from "./plan";
+import { planRun, type PlannedDocument } from "./plan";
 import { prepareCandidates, type PreparedCandidate, type RejectedCandidate } from "./merge";
 import { reviewCase } from "./review";
 import { DERIVATIONS } from "./derived";
-import { classifyDocument, CLASSIFY_PROMPT_VERSION, type ClassifyResult, type DocumentFacts } from "./tasks/classifyDocument";
-import { extractCandidates, inCalls, EXTRACT_PROMPT_VERSION, type OfferedPage } from "./tasks/extractCandidates";
-import { writeFinding, FINDING_PROMPT_VERSION } from "./tasks/writeFinding";
+import { classifyDocument, type ClassifyResult, type DocumentFacts } from "./tasks/classifyDocument";
+import { extractCandidates, inCalls, type OfferedPage } from "./tasks/extractCandidates";
+import { writeFinding } from "./tasks/writeFinding";
 import { locateDocumentQuotes } from "@/db/pages";
 import {
   chosenCandidate,
@@ -70,10 +70,6 @@ export interface RunOptions {
 }
 
 export interface RunReport {
-  readonly caseId: string;
-  readonly runNumber: number;
-  readonly documentsRead: number;
-  readonly pagesRead: number;
   readonly candidatesWritten: number;
   readonly subfieldsFilled: number;
   readonly rowsTouched: number;
@@ -85,7 +81,6 @@ export interface RunReport {
   readonly resolved: readonly ResolvedItem[];
   readonly rejected: readonly RejectedCandidate[];
   readonly failures: readonly string[];
-  readonly skipped: RunPlan["skipped"];
   readonly summary: string;
 }
 
@@ -315,27 +310,7 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
     `${open.length} von ${reviewed.length} Feldern offen`,
   ].join(", ");
 
-  // All three stages produced this state, so the export names all three versions.
-  await finishRun(runId, caseId, summary, {
-    model: provider.model,
-    promptVersion: `classify ${CLASSIFY_PROMPT_VERSION} / extract ${EXTRACT_PROMPT_VERSION} / finding ${FINDING_PROMPT_VERSION}`,
-  });
+  await finishRun(runId, caseId, summary);
 
-  return {
-    caseId,
-    runNumber: plan.number,
-    documentsRead: plan.documents.length,
-    pagesRead: plan.pageCount,
-    candidatesWritten,
-    subfieldsFilled,
-    rowsTouched,
-    findingsWritten,
-    quotesLocated,
-    quotesAmbiguous,
-    resolved,
-    rejected,
-    failures: allFailures,
-    skipped: plan.skipped,
-    summary,
-  };
+  return { candidatesWritten, subfieldsFilled, rowsTouched, findingsWritten, quotesLocated, quotesAmbiguous, resolved, rejected, failures: allFailures, summary };
 };

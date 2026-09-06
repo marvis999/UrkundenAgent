@@ -1,9 +1,8 @@
 import type { IconName } from "@/components/ui/icons";
 import { routes } from "@/lib/routes";
-import { formatPositions, formatRun, plural } from "@/lib/format";
+import { formatRun, plural } from "@/lib/format";
 import type { Candidate, CandidateTarget, CaseView, Field, FieldId, Finding, ReviewPart } from "./model";
-import { FIELD_STATUS_META, OVERVIEW_GROUPS, type FieldStatus, type OverviewGroupId } from "./status";
-import type { Tone } from "./tone";
+import { FIELD_STATUS_META, OVERVIEW_GROUPS, type FieldStatus, type OverviewGroupId, type Tone } from "./status";
 
 /* Every number on screen comes from these functions. Nothing is stored twice. */
 
@@ -114,7 +113,7 @@ export const deriveBanner = (view: CaseView): Banner => {
       tone: "proposed",
       icon: "clock",
       title: "Wartet auf Rückmeldung",
-      text: `Anforderung an ${view.recipient} gesendet, ${formatPositions(basket.length)}. Die betroffenen Felder sind markiert.`,
+      text: `Anforderung an ${view.recipient} gesendet, ${plural(basket.length, "Position", "Positionen")}. Die betroffenen Felder sind markiert.`,
       action: { label: "Nachfassen", icon: "mail", href: routes.caseRequest(c.id), emphasis: "quiet" },
       secondary: { label: "Rückmeldung ist da", icon: "inbox", href: routes.caseDocuments(c.id), emphasis: "quiet" },
     };
@@ -149,7 +148,7 @@ export const deriveBanner = (view: CaseView): Banner => {
     return {
       tone: "attention",
       icon: "list-checks",
-      title: `${formatPositions(basket.length)} anzufordern`,
+      title: `${plural(basket.length, "Position", "Positionen")} anzufordern`,
       text: "Die Anforderung ist aus den Befunden erzeugt und bleibt an den Feldern vermerkt.",
       action: { label: "Anforderung öffnen", icon: "arrow-right", href: routes.caseRequest(c.id), emphasis: "strong" },
     };

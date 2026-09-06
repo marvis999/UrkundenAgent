@@ -1,6 +1,8 @@
 import type { IconName } from "@/components/ui/icons";
 import type { CandidateTag } from "./computeStatus";
-import type { Tone } from "./tone";
+
+/** Visual tone. Every colored element in the UI resolves to one of these. */
+export type Tone = "confirmed" | "proposed" | "attention" | "missing" | "neutral" | "accent";
 
 /** Shape shared by every status-like enum: what the badge shows. */
 export interface StatusMeta {
@@ -11,17 +13,7 @@ export interface StatusMeta {
 
 /* ---------- Field / subfield / table-row status ---------- */
 
-export const FIELD_STATUSES = [
-  "confirmed",
-  "proposed",
-  "derived",
-  "outdated",
-  "conflict",
-  "uncertain",
-  "missing",
-  "redacted",
-] as const;
-export type FieldStatus = (typeof FIELD_STATUSES)[number];
+export type FieldStatus = "confirmed" | "proposed" | "derived" | "outdated" | "conflict" | "uncertain" | "missing" | "redacted";
 
 export interface FieldStatusMeta extends StatusMeta {
   /** Higher rank = worse. Field status is the highest-ranked status of its parts. */
@@ -86,8 +78,7 @@ export const DOCUMENT_STATUS_META: Record<DocumentStatus, StatusMeta> = {
 
 /* ---------- Document kind (drives the file icon) ---------- */
 
-export const DOCUMENT_KINDS = ["email", "note", "scan", "photo", "table", "register"] as const;
-export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+export type DocumentKind = "email" | "note" | "scan" | "photo" | "table" | "register";
 
 export const DOCUMENT_KIND_ICON: Record<DocumentKind, IconName> = {
   email: "mail",
@@ -135,8 +126,7 @@ export const PROCEDURE_META: Record<Procedure, { label: string; consequence: str
 
 /* ---------- Request item outcome after a run ---------- */
 
-export const REQUEST_OUTCOMES = ["done", "partial", "open"] as const;
-export type RequestOutcome = (typeof REQUEST_OUTCOMES)[number];
+export type RequestOutcome = "done" | "partial" | "open";
 
 export const REQUEST_OUTCOME_META: Record<RequestOutcome, StatusMeta> = {
   done: { label: "erledigt", tone: "confirmed", icon: "circle-check" },
@@ -146,12 +136,10 @@ export const REQUEST_OUTCOME_META: Record<RequestOutcome, StatusMeta> = {
 
 /* ---------- Case phase (the circle) ---------- */
 
-export const PHASES = ["review", "waiting", "intake", "analysis"] as const;
-export type Phase = (typeof PHASES)[number];
+export type Phase = "review" | "waiting" | "intake" | "analysis";
 
 /* ---------- Actor of a history entry ---------- */
 
-export const ACTORS = ["agent", "user"] as const;
-export type Actor = (typeof ACTORS)[number];
+export type Actor = "agent" | "user";
 
 export const ACTOR_LABEL: Record<Actor, string> = { agent: "Agent", user: "SB" };

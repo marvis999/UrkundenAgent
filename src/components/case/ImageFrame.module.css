@@ -2,7 +2,7 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius);
-  background: var(--color-paper-photo);
+  background: var(--color-surface-strong);
 }
 /*
  * A ratio rather than a height: the component works out which part of the page to show
@@ -11,43 +11,17 @@
  */
 .inline {
   width: 100%;
-  /* Set per excerpt from the shape of the marked region; the fallback is for a card whose
-     document has not been imported and so has no region to shape it. */
+  /* Set per excerpt from the shape of the marked region. */
   aspect-ratio: var(--excerpt-ratio, 2.2);
   min-height: var(--image-excerpt-height);
 }
+/* The frame takes the image's proportions: a landscape photo is not A4. */
 .page {
   width: min(100%, var(--viewer-page-width));
-  aspect-ratio: var(--paper-ratio);
   margin: 0 auto;
 }
 
-/* Faux handwriting lines until the real image is wired in. Percentages shape the placeholder only. */
-.paper {
-  position: absolute;
-  inset: -16% -7%;
-  transform: rotate(var(--faux-tilt));
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--color-paper-ink) 0,
-    var(--color-paper-ink) var(--faux-line),
-    transparent var(--faux-line),
-    transparent var(--faux-pitch)
-  );
-  background-clip: content-box;
-  padding: 26% 30%;
-  opacity: 0.35;
-}
-
 /* The layer the image and its marker share, so both zoom together. */
-.flat {
-  position: absolute;
-  inset: 0;
-}
-/* The frame takes the image's proportions instead of imposing the paper ratio. */
-.sized {
-  aspect-ratio: auto;
-}
 .natural {
   position: relative;
 }

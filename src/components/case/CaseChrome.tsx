@@ -8,11 +8,12 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { Text } from "@/components/ui/Text";
 import { TopBar, UserChip } from "@/components/ui/TopBar";
+import { CLAUSES } from "@/catalog/fields";
 import { workspace } from "@/data/workspace";
 import { deriveBanner, type ActionEmphasis, type BannerAction } from "@/domain/derive";
 import type { CaseView } from "@/domain/model";
 import { CASE_STATUS_META } from "@/domain/status";
-import { formatFiles } from "@/lib/format";
+import { plural } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { AutoRefresh } from "./AutoRefresh";
 import { StartRun } from "./RunControl";
@@ -67,11 +68,11 @@ export function CaseChrome({ view, children }: CaseChromeProps) {
     { label: "Urkundendaten", detail: `${view.fields.length} Felder`, href: routes.case(c.id) },
     {
       label: "Unterlagen",
-      detail: formatFiles(view.documents.length),
+      detail: plural(view.documents.length, "Datei", "Dateien"),
       badge: c.phase === "intake" && newDocuments > 0 ? `${newDocuments} neu` : undefined,
       href: routes.caseDocuments(c.id),
     },
-    { label: "Entwurf", detail: `${view.clauses.length} §§`, href: routes.caseDraft(c.id) },
+    { label: "Entwurf", detail: `${CLAUSES.length} §§`, href: routes.caseDraft(c.id) },
   ];
 
   return (

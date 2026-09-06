@@ -19,7 +19,7 @@
   gap: var(--space-3);
 }
 
-/* Faux text page until PDF rendering is wired in. */
+/* A document that is text and nothing else: a note or an e-mail. */
 .sheet {
   display: flex;
   flex-direction: column;
@@ -34,22 +34,6 @@
   flex-direction: column;
   gap: var(--gap-hairline);
 }
-.lines {
-  height: var(--faux-block);
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--color-surface-hover) 0,
-    var(--color-surface-hover) var(--faux-line),
-    transparent var(--faux-line),
-    transparent var(--faux-pitch)
-  );
-  mask-image: linear-gradient(to right, black 0, black 80%, transparent 100%);
-}
-.short {
-  height: calc(var(--faux-block) / 2);
-  width: 60%;
-}
-
 /* A note as it was pasted: its own line breaks are part of what was written. */
 .text {
   margin: 0;
