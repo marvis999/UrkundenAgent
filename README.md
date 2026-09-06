@@ -83,7 +83,9 @@ Der Vorgang läuft im Browser rund, ohne Kommandozeile:
    Fortschritt je Dokument und lädt sich selbst nach; **Abbrechen** stoppt die laufenden
    Modellaufrufe und gibt die Dateien für einen erneuten Durchlauf frei. Eine Seite, die
    auf der Seite liegt, wird vor dem Lesen aufrecht gedreht, damit Fundstellen und
-   Seitenansicht dasselbe Bild zeigen.
+   Seitenansicht dasselbe Bild zeigen; das Bild selbst hat dabei ein Veto, denn eine
+   Seite, deren Text sichtbar in Zeilen läuft, legt kein Modell auf die Seite. In der
+   Seitenansicht lässt sich jede Seite von Hand drehen, die Markierungen drehen mit.
 3. **Urkundendaten** — jeder Wert mit seiner Fundstelle: dem Zitat aus der Seite und dem
    Ausschnitt des Seitenbilds, auf dem es steht. Bestätigen, einen anderen Kandidaten
    wählen oder mit Begründung korrigieren.

@@ -174,17 +174,20 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
    * rectangles the extraction returns and the picture they are drawn on are the same
    * picture. The classification saw the image as stored, so its answer is the turn still
    * missing; the page is rendered again from the original with the total, in place, and
-   * the answer cache misses on the new bytes by itself.
+   * the answer cache misses on the new bytes by itself. The picture gets a veto: a quarter
+   * turn on a page whose text visibly runs in rows is a model's mistake, not a scan's.
    */
   const upright = new Map<string, number>();
   for (const { document, result } of fulfilled(classifyResults)) {
     for (const page of document.pages) {
       const turn = result.rotations.get(page.number) ?? 0;
       if (turn === 0 || page.imagePath === null) continue;
-      const total = (page.rotation + turn) % 360;
-      await turnDocumentPage(caseId, document.id, page.number, total);
-      upright.set(pageKey(document.id, page.number), total);
-      say(`  gedreht: ${document.fileName}, Seite ${page.number}, um ${turn}°`);
+      if ((await turnDocumentPage(caseId, document.id, page.number, turn)) === "turned") {
+        upright.set(pageKey(document.id, page.number), (page.rotation + turn) % 360);
+        say(`  gedreht: ${document.fileName}, Seite ${page.number}, um ${turn}°`);
+      } else {
+        say(`  nicht gedreht: ${document.fileName}, Seite ${page.number} — der Text läuft schon in Zeilen`);
+      }
     }
   }
 
@@ -312,6 +315,7 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
     `${plural(plan.documents.length, "Datei", "Dateien")} gelesen`,
     `${plural(plan.pageCount, "Seite", "Seiten")}`,
     `${plural(candidatesWritten, "Fundstelle", "Fundstellen")}`,
+    ...(upright.size === 0 ? [] : [`${plural(upright.size, "Seite", "Seiten")} aufrecht gedreht`]),
     ...(rejected.length === 0 ? [] : [`${rejected.length} Angaben verworfen`]),
     ...(quotesAmbiguous === 0 ? [] : [`${quotesAmbiguous} Zitate nicht eindeutig`]),
     `${open} von ${fields.length} Feldern offen`,

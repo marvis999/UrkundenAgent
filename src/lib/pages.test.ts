@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fractionsOf } from "./pages";
+import { fractionsOf, turnRect } from "./pages";
 
 /**
  * The one piece of the renderer that is arithmetic rather than MuPDF: where a marked
@@ -25,4 +25,15 @@ test("a quarter turn carries a word from the top left of a portrait page to its 
 
   const half = fractionsOf(word, bounds, 180);
   assert.ok(half.x > 60 && half.y > 85, JSON.stringify(half));
+});
+
+test("a stored marker turns with its page, and four quarter turns bring it back", () => {
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  const rect = { x: 0.1, y: 0.2, w: 0.3, h: 0.05 };
+  const quarter = turnRect(rect, 90);
+  assert.ok(near(quarter.x, 0.75) && near(quarter.y, 0.1) && near(quarter.w, 0.05) && near(quarter.h, 0.3), JSON.stringify(quarter));
+  const half = turnRect(rect, 180);
+  assert.ok(near(half.x, 0.6) && near(half.y, 0.75), JSON.stringify(half));
+  const around = [90, 90, 90, 90].reduce((r, turn) => turnRect(r, turn), rect);
+  assert.ok(near(around.x, rect.x) && near(around.y, rect.y) && near(around.w, rect.w) && near(around.h, rect.h));
 });

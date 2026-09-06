@@ -1,8 +1,9 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { Rect } from "@/domain/model";
 import { fileType } from "@/lib/documents";
-import { canRender, locateQuotes, renderPages, renderTurned } from "@/lib/pages";
-import { documentsDirectory, int, query, queryOne, text, textOrNull, transaction } from "./connect";
+import { canRender, locateQuotes, renderPages, renderTurned, textDirection, turnRect } from "@/lib/pages";
+import { documentsDirectory, int, json, query, queryOne, text, textOrNull, transaction, type Row } from "./connect";
 
 /**
  * Rendered pages of a document: one image and one text per page.
@@ -118,31 +119,66 @@ export const renderDocumentPages = async (caseId: string, documentKey: string): 
   return { documentId, pageCount: rendered.length };
 };
 
+export type TurnOutcome = "turned" | "kept";
+
 /**
- * Turns one page upright: renders it again from the original with the given total turn,
- * replaces its image in place and records the turn. Everything that reads the page
- * afterwards -- the extraction, the viewer, the marker -- sees the same picture.
+ * Turns one page by `delta` degrees clockwise: renders it again from the original with the
+ * total turn, replaces its image in place, records the turn, and turns the quote markers
+ * on the page with it. Everything that reads the page afterwards -- the extraction, the
+ * viewer, the markers -- sees one picture, and nothing has to be read again.
+ *
+ * A quarter turn is refused when the picture itself says the text already runs in rows: a
+ * model's single judgement is not enough to lay an upright page on its side. A person may
+ * force it.
  */
-export const turnDocumentPage = async (caseId: string, documentKey: string, number: number, rotation: number): Promise<void> => {
+export const turnDocumentPage = async (
+  caseId: string,
+  documentKey: string,
+  number: number,
+  delta: number,
+  options: { force?: boolean } = {},
+): Promise<TurnOutcome> => {
   const row = await findDocument(caseId, documentKey);
   const storagePath = row === undefined ? null : textOrNull(row.storage_path);
-  if (row === undefined || storagePath === null) return;
+  if (row === undefined || storagePath === null) return "kept";
   const documentId = text(row.id);
-  const pageRow = await queryOne("SELECT image_path FROM page WHERE document_id = $1 AND number = $2", documentId, number);
+  const pageRow = await queryOne("SELECT image_path, rotation FROM page WHERE document_id = $1 AND number = $2", documentId, number);
   const imagePath = pageRow === undefined ? null : textOrNull(pageRow.image_path);
-  if (imagePath === null) return;
+  const turn = ((delta % 360) + 360) % 360;
+  if (imagePath === null || turn === 0) return "kept";
 
+  const imageAbsolute = path.join(documentsDirectory(), imagePath);
+  if (!options.force && turn % 180 !== 0 && (await textDirection(await readFile(imageAbsolute))) === "rows") return "kept";
+
+  const rotation = (int(pageRow?.rotation) + turn) % 360;
   const bytes = await readFile(path.join(documentsDirectory(), storagePath));
   const page = await renderTurned(bytes, contentTypeOf(text(row.file_name)), number, rotation);
-  await writeFile(path.join(documentsDirectory(), imagePath), page.png);
-  await query(
-    "UPDATE page SET width = $1, height = $2, rotation = $3 WHERE document_id = $4 AND number = $5",
-    page.width,
-    page.height,
-    rotation,
-    documentId,
-    number,
-  );
+  await writeFile(imageAbsolute, page.png);
+  await transaction(async (client) => {
+    await client.query("UPDATE page SET width = $1, height = $2, rotation = $3 WHERE document_id = $4 AND number = $5", [
+      page.width,
+      page.height,
+      rotation,
+      documentId,
+      number,
+    ]);
+    /*
+     * Only the markers found from the text layer turn with the page: those sit in the
+     * pixel frame by construction. A model draws its box in the frame it reads in, and on
+     * a page lying on its side that is already the upright one -- the boxes it returned
+     * for such pages were row-shaped, not column-shaped. Turning those too would put them
+     * wrong; left alone they fit the page once it stands upright.
+     */
+    const { rows } = await client.query<Row>(
+      "SELECT id, crop FROM candidate WHERE document_id = $1 AND page = $2 AND crop IS NOT NULL AND quote IS NOT NULL",
+      [documentId, number],
+    );
+    for (const candidate of rows) {
+      const crop = json<Rect>(candidate.crop);
+      if (crop) await client.query("UPDATE candidate SET crop = $1 WHERE id = $2", [JSON.stringify(turnRect(crop, turn)), text(candidate.id)]);
+    }
+  });
+  return "turned";
 };
 
 const FRACTION = 100;

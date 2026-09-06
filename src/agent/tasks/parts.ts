@@ -43,14 +43,15 @@ export const pagePart = (page: PlannedPage): PromptPart =>
         caption: `--- Seite ${page.number} (Bild, ${page.width}x${page.height} px) ---`,
       };
 
-export const pageParts = (pages: readonly PlannedPage[]): PromptPart[] => pages.map(pagePart);
-
-/** Header that names the file the pages belong to, so the model can cite it. */
+/**
+ * Header that names the file and lists its pages by their position in this request. The
+ * position is how the model addresses a page; the printed page number is only a label.
+ */
 export const documentHeader = (document: PlannedDocument, pages: readonly PlannedPage[]): PromptPart => ({
   kind: "text",
   text: [
     `Datei: ${document.fileName}`,
-    `Seiten in dieser Anfrage: ${pages.map((page) => page.number).join(", ")}`,
-    `Davon mit Textebene: ${pages.filter(hasText).map((page) => page.number).join(", ") || "keine"}`,
+    "Seiten in dieser Anfrage, in dieser Reihenfolge:",
+    ...pages.map((page, index) => `  pageRef ${index + 1} = Seite ${page.number} (${hasText(page) ? "Text" : "Bild"})`),
   ].join("\n"),
 });

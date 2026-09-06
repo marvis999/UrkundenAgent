@@ -4,7 +4,7 @@ import type { PlannedDocument } from "@/agent/plan";
 import { FIELD_CATALOG } from "@/catalog/fields";
 import { FIELD_IDS, type FieldId } from "@/domain/model";
 import { DOC_TYPES, DOCUMENT_STATUSES, SOURCE_CLASSES, type DocType, type DocumentStatus, type SourceClass } from "@/domain/status";
-import { documentHeader, pageParts } from "./parts";
+import { documentHeader, pagePart } from "./parts";
 
 /**
  * Agent 1: what is this document, and which page holds what.
@@ -26,10 +26,14 @@ import { documentHeader, pageParts } from "./parts";
  * the worst case is that extraction looks at a page that turns out to hold nothing.
  */
 
-export const CLASSIFY_PROMPT_VERSION = "2026-09-08";
+export const CLASSIFY_PROMPT_VERSION = "2026-09-09";
 
 const PageRoleSchema = z.object({
-  number: z.number().int().positive(),
+  /**
+   * 1-based position of the page in this request. Not the page's number in the document:
+   * a sheet with "Seite 30" printed on it once came back as page 30 and was lost.
+   */
+  pageRef: z.number().int().positive(),
   /** Short German name for the section, e.g. "Bestandsverzeichnis", "Abteilung III". */
   role: z.string(),
   /** Degrees clockwise the image must be turned to read upright: 0, 90, 180 or 270. */
@@ -104,8 +108,9 @@ status — der Zustand der Datei, nicht der Werte darin:
   notRelevant     kein Feld der Urkunde bezieht sich darauf
   partlyRedacted  Teile sind bewusst unlesbar gemacht
 
-pages — für jede Seite, die du bekommen hast, genau ein Eintrag:
-  number     die Seitenzahl, wie sie im Seitenkopf steht
+pages — für jede Seite dieser Anfrage genau ein Eintrag:
+  pageRef    die laufende Nummer aus der Überschrift "=== pageRef k ===" über der Seite.
+             Nicht die Seitenzahl, die im Dokument gedruckt steht.
   role       kurze deutsche Bezeichnung des Abschnitts, etwa "Aufschrift",
              "Bestandsverzeichnis", "Abteilung II", "Deckblatt", "Summenzeile"
   rotation   um wie viel Grad im Uhrzeigersinn das Bild gedreht werden muss, damit der
@@ -161,7 +166,10 @@ const classifySection = (
           },
         ]),
     documentHeader(document, pages),
-    ...pageParts(pages),
+    ...pages.flatMap((page, index) => [
+      { kind: "text" as const, text: `=== pageRef ${index + 1}: Seite ${page.number} ===` },
+      pagePart(page),
+    ]),
   ];
 
   return completeJson(
@@ -188,7 +196,6 @@ export const classifyDocument = async (
 
   // A page the model did not mention keeps no routing, which simply means no field
   // extraction looks at it. A page it invented is dropped the same way.
-  const known = new Set(document.pages.map((page) => page.number));
   const routing = new Map<number, readonly FieldId[]>();
   const rotations = new Map<number, number>();
 
@@ -205,10 +212,12 @@ export const classifyDocument = async (
       const { docType, docDate, sourceClass, status } = call.value;
       facts = { docType, docDate, sourceClass, status };
     }
-    for (const page of call.value.pages) {
-      if (!known.has(page.number)) continue;
-      routing.set(page.number, page.fieldKeys);
-      rotations.set(page.number, TURNS.includes(page.rotation) ? page.rotation : 0);
+    for (const entry of call.value.pages) {
+      // By position in this request, so a page number printed on the sheet cannot mislead.
+      const page = pages[entry.pageRef - 1];
+      if (page === undefined) continue;
+      routing.set(page.number, entry.fieldKeys);
+      rotations.set(page.number, TURNS.includes(entry.rotation) ? entry.rotation : 0);
     }
   }
 

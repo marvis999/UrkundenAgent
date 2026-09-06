@@ -193,6 +193,121 @@ export const fractionsOf = (points: readonly [number, number][], bounds: Bounds,
   };
 };
 
+/** A rectangle in fractions of a page, after the page turned `rotation` degrees clockwise. */
+export const turnRect = (rect: Rect, rotation: number): Rect => {
+  switch (((rotation % 360) + 360) % 360) {
+    case 90:
+      return { x: 1 - rect.y - rect.h, y: rect.x, w: rect.h, h: rect.w };
+    case 180:
+      return { x: 1 - rect.x - rect.w, y: 1 - rect.y - rect.h, w: rect.w, h: rect.h };
+    case 270:
+      return { x: rect.y, y: 1 - rect.x - rect.w, w: rect.h, h: rect.w };
+    default:
+      return rect;
+  }
+};
+
+/* ---------- Which way the text runs ---------- */
+
+export type TextDirection = "rows" | "columns" | "unknown";
+
+/** Long edge of the picture the profiles are taken from; enough to keep lines of text apart. */
+const PROFILE_EDGE = 800;
+/** Share of each edge left out, so margins and binding shadows do not count as structure. */
+const PROFILE_MARGIN = 0.15;
+/** Fewer crossings than this is not a page of text. */
+const MIN_CROSSINGS = 12;
+/** One direction has to beat the other by this much before the picture is believed. */
+const CLEAR_LEAD = 2;
+const INK = 128;
+const SMOOTHING = 1;
+
+/** Times a profile, lightly smoothed, crosses its own mean: two per line of text, few per column of it. */
+const crossings = (profile: Float64Array, from: number, to: number): number => {
+  const smooth = (i: number) => {
+    let sum = 0;
+    for (let k = i - SMOOTHING; k <= i + SMOOTHING; k += 1) sum += profile[Math.min(to - 1, Math.max(from, k))] ?? 0;
+    return sum / (2 * SMOOTHING + 1);
+  };
+  let total = 0;
+  for (let i = from; i < to; i += 1) total += profile[i] ?? 0;
+  const mean = total / (to - from);
+  let count = 0;
+  let above: boolean | undefined;
+  for (let i = from; i < to; i += 1) {
+    const now = smooth(i) > mean;
+    if (above !== undefined && now !== above) count += 1;
+    above = now;
+  }
+  return count;
+};
+
+/** Coefficient of variation of a profile: how unevenly the ink is spread along it. */
+const spread = (profile: Float64Array, from: number, to: number): number => {
+  let total = 0;
+  for (let i = from; i < to; i += 1) total += profile[i] ?? 0;
+  const mean = total / (to - from);
+  if (mean === 0) return 0;
+  let squares = 0;
+  for (let i = from; i < to; i += 1) squares += ((profile[i] ?? 0) - mean) ** 2;
+  return Math.sqrt(squares / (to - from)) / mean;
+};
+
+/**
+ * Whether the text on a page image runs in rows or in columns, from the picture alone.
+ *
+ * Ink on a page of text comes in lines: a profile of dark pixels per row crosses its
+ * mean twice per line, a profile per column hardly at all. On a page lying on its side
+ * the two swap. Counting the crossings needs neither a model nor OCR, and it answers
+ * exactly the question a wrong quarter turn gets wrong. It cannot tell upright from
+ * upside down, and it says "unknown" for a picture that is not a page of text.
+ */
+export const textDirection = async (png: Uint8Array): Promise<TextDirection> => {
+  const mupdf = await import("mupdf");
+  const document = mupdf.Document.openDocument(png, "image/png");
+  try {
+    const page = document.loadPage(0);
+    try {
+      const [x0, y0, x1, y1] = page.getBounds();
+      const scale = PROFILE_EDGE / Math.max(x1 - x0, y1 - y0);
+      const pixmap = page.toPixmap(mupdf.Matrix.scale(scale, scale), mupdf.ColorSpace.DeviceGray, false, true);
+      try {
+        const width = pixmap.getWidth();
+        const height = pixmap.getHeight();
+        const stride = pixmap.getStride();
+        const pixels = pixmap.getPixels();
+        const rows = new Float64Array(height);
+        const columns = new Float64Array(width);
+        const left = Math.floor(width * PROFILE_MARGIN);
+        const right = Math.ceil(width * (1 - PROFILE_MARGIN));
+        const top = Math.floor(height * PROFILE_MARGIN);
+        const bottom = Math.ceil(height * (1 - PROFILE_MARGIN));
+        for (let y = top; y < bottom; y += 1) {
+          for (let x = left; x < right; x += 1) {
+            if ((pixels[y * stride + x] ?? 255) < INK) {
+              rows[y] = (rows[y] ?? 0) + 1;
+              columns[x] = (columns[x] ?? 0) + 1;
+            }
+          }
+        }
+        const byRow = crossings(rows, top, bottom);
+        const byColumn = crossings(columns, left, right);
+        const rowSpread = spread(rows, top, bottom);
+        const columnSpread = spread(columns, left, right);
+        if (byRow >= MIN_CROSSINGS && byRow > CLEAR_LEAD * byColumn) return "rows";
+        if (byColumn >= MIN_CROSSINGS && byColumn > CLEAR_LEAD * byRow) return "columns";
+        return "unknown";
+      } finally {
+        pixmap.destroy();
+      }
+    } finally {
+      page.destroy();
+    }
+  } finally {
+    document.destroy();
+  }
+};
+
 /* ---------- Locating ---------- */
 
 export interface Located {

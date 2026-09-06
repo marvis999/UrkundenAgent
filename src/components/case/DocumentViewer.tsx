@@ -1,4 +1,4 @@
-import { chooseCandidateAction } from "@/app/actions";
+import { chooseCandidateAction, turnPageAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -57,6 +57,12 @@ export function DocumentViewer({ view, document, page: requestedPage, text: page
             Seite {page} von {document.pageCount}
           </Text>
           <Button variant="ghost" icon="chevron-right" href={pageHref(page + 1)} disabled={page === document.pageCount} label="Nächste Seite" />
+          {/* The override for a turn the run got wrong or missed; the markers turn with the page. */}
+          {pageSrc && (
+            <ActionForm action={turnPageAction} values={{ case: caseId, document: document.id, page: String(page) }}>
+              <Button variant="ghost" icon="rotate-cw" submit label="Seite um 90° drehen" />
+            </ActionForm>
+          )}
         </>
       }
       footer={

@@ -6,6 +6,7 @@ import { cancelAnalysis, startAnalysis } from "@/agent/dispatch";
 import { PROCEDURES, type Procedure } from "@/domain/status";
 import { createCase } from "@/db/cases";
 import { ingestDocument } from "@/db/files";
+import { turnDocumentPage } from "@/db/pages";
 import { chooseCandidate, chooseReading, confirmValue, correctSubfield, sendRequest, setBasketItem, setProcedure } from "@/db/mutations";
 import { noteFileName } from "@/lib/documents";
 import { parseFieldId } from "@/lib/load";
@@ -71,6 +72,16 @@ export async function setProcedureAction(form: FormData) {
 
 export async function sendRequestAction(form: FormData) {
   await sendRequest(value(form, "case"), value(form, "recipient"), value(form, "subject"), value(form, "body"));
+  refresh();
+}
+
+const QUARTER_TURN = 90;
+
+/** A person turns a page a quarter clockwise: the override for a turn the run got wrong or missed. */
+export async function turnPageAction(form: FormData) {
+  const page = Number.parseInt(value(form, "page"), 10);
+  if (!Number.isFinite(page)) return;
+  await turnDocumentPage(value(form, "case"), value(form, "document"), page, QUARTER_TURN, { force: true });
   refresh();
 }
 
