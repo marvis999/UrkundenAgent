@@ -32,16 +32,28 @@ const findDocument = (caseId: string, documentKey: string) =>
     `${caseId}:${documentKey}`,
   );
 
-export interface RenderResult {
+export interface QuoteReport {
+  /** Quotes that were found exactly once, and so carry a marked region. */
+  quotesLocated: number;
+  /** Not on the page they name. A value whose quote is nowhere in the document it cites. */
+  quotesMissing: number;
+  /**
+   * On the page more than once, so the quote does not say which occurrence was read.
+   * Marking the first would be a guess drawn as evidence -- the clerk would check a
+   * different passage and find the same words there, which is exactly how a corrected
+   * amount gets confirmed against the sentence it superseded.
+   */
+  quotesAmbiguous: number;
+}
+
+export interface RenderResult extends QuoteReport {
   documentId: string;
   pageCount: number;
   /** Pages that carry a text layer; the rest are scans or photos. */
   pagesWithText: number;
-  /** Quotes that were found on the page they name, and so carry a marked region. */
-  quotesLocated: number;
-  /** Quotes that were not found there. Each one is a value worth looking at again. */
-  quotesUnresolved: number;
 }
+
+const NO_QUOTES: QuoteReport = { quotesLocated: 0, quotesMissing: 0, quotesAmbiguous: 0 };
 
 interface PageRow {
   number: number;
@@ -128,17 +140,14 @@ const FRACTION = 100;
  *
  * A quote that occurs several times on one page pins nothing, so it gets no region either.
  */
-export const locateDocumentQuotes = async (
-  caseId: string,
-  documentKey: string,
-): Promise<{ quotesLocated: number; quotesUnresolved: number }> => {
+export const locateDocumentQuotes = async (caseId: string, documentKey: string): Promise<QuoteReport> => {
   const row = await findDocument(caseId, documentKey);
   const storagePath = row === undefined ? null : textOrNull(row.storage_path);
-  if (row === undefined || storagePath === null) return { quotesLocated: 0, quotesUnresolved: 0 };
+  if (row === undefined || storagePath === null) return NO_QUOTES;
 
   // A text document has no page image, so a quote from it has nowhere to be marked. Its
   // Fundstelle is the quote itself, which the merge already checked against the page.
-  if (fileType(text(row.file_name)).form === "text") return { quotesLocated: 0, quotesUnresolved: 0 };
+  if (fileType(text(row.file_name)).form === "text") return NO_QUOTES;
 
   const documentId = text(row.id);
   const candidates = await query(
@@ -146,7 +155,7 @@ export const locateDocumentQuotes = async (
      WHERE document_id = $1 AND quote IS NOT NULL AND page IS NOT NULL AND crop IS NULL`,
     documentId,
   );
-  if (candidates.length === 0) return { quotesLocated: 0, quotesUnresolved: 0 };
+  if (candidates.length === 0) return NO_QUOTES;
 
   const bytes = await readFile(path.join(documentsDirectory(), storagePath));
   const located = await locateQuotes(
@@ -156,9 +165,18 @@ export const locateDocumentQuotes = async (
   );
 
   let quotesLocated = 0;
+  let quotesMissing = 0;
+  let quotesAmbiguous = 0;
   for (const [index, candidate] of candidates.entries()) {
     const hit = located[index];
-    if (hit === undefined || hit.hits > 1) continue;
+    if (hit === undefined) {
+      quotesMissing += 1;
+      continue;
+    }
+    if (hit.hits > 1) {
+      quotesAmbiguous += 1;
+      continue;
+    }
     const { rect } = hit;
     await query("UPDATE candidate SET crop = $1 WHERE id = $2", JSON.stringify({
       x: rect.x / FRACTION,
@@ -171,7 +189,7 @@ export const locateDocumentQuotes = async (
     }), text(candidate.id));
     quotesLocated += 1;
   }
-  return { quotesLocated, quotesUnresolved: candidates.length - quotesLocated };
+  return { quotesLocated, quotesMissing, quotesAmbiguous };
 };
 
 export interface PageImage {

@@ -25,7 +25,7 @@ import { hasText, pagePart } from "./parts";
  * model cannot get subtly wrong.
  */
 
-export const EXTRACT_PROMPT_VERSION = "2026-09-06b";
+export const EXTRACT_PROMPT_VERSION = "2026-09-07";
 
 /**
  * Pages per call. Beyond this the request is split, keeping document order.
@@ -176,8 +176,10 @@ Herkunft:
   Seitenzahl im Dokument, sondern die laufende Nummer in der Liste.
 - quote: bei einer Textseite der Satz oder die Zeile wörtlich, Zeichen für Zeichen aus dem
   Seitentext kopiert, den du oben bekommen hast. Nicht zusammengefasst, nicht korrigiert,
-  nicht gekürzt. Der Text steht dir vor Augen, wörtliches Kopieren ist also immer möglich;
-  ein kurzes Zitat, das sicher dasteht, ist besser als ein langes.
+  nicht gekürzt. Der Text steht dir vor Augen, wörtliches Kopieren ist also immer möglich.
+  Das Zitat muss die Stelle eindeutig bezeichnen: steht derselbe Wortlaut mehrfach auf der
+  Seite, nimm so viel vom Satz davor oder danach dazu, bis er nur noch einmal vorkommt.
+  Ein Betrag oder ein Datum allein genügt dafür meist nicht. Sonst so kurz wie möglich.
 - crop: bei einer Bildseite das Rechteck um die Fundstelle, als Anteile der Seite zwischen
   0 und 1, Ursprung links oben. Auf einer Bildseite ist quote null, auf einer Textseite ist
   crop null.

@@ -80,6 +80,8 @@ export interface RunReport {
   readonly findingsWritten: number;
   /** Quotes that could be pinned to one place on their page and so carry a marker. */
   readonly quotesLocated: number;
+  /** Quotes that stand more than once on their page, so they mark nothing. */
+  readonly quotesAmbiguous: number;
   readonly resolved: readonly ResolvedItem[];
   readonly rejected: readonly RejectedCandidate[];
   readonly failures: readonly string[];
@@ -235,13 +237,17 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
    * gets a marker; one that is found twice pins nothing and gets none.
    */
   let quotesLocated = 0;
+  let quotesAmbiguous = 0;
   const locateResults = await inParallel(
     plan.documents,
     async (document) => locateDocumentQuotes(caseId, document.id),
     limit,
   );
   allFailures.push(...failures(locateResults, (index) => `Fundstellen markieren ${plan.documents[index]?.fileName ?? "?"}`));
-  for (const result of fulfilled(locateResults)) quotesLocated += result.quotesLocated;
+  for (const result of fulfilled(locateResults)) {
+    quotesLocated += result.quotesLocated;
+    quotesAmbiguous += result.quotesAmbiguous;
+  }
   say(`  ${plural(quotesLocated, "Fundstelle", "Fundstellen")} auf der Seite markiert`);
 
   /* ---------- Derived values ---------- */
@@ -294,10 +300,18 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
   /* ---------- Close ---------- */
 
   const open = reviewed.filter((field) => field.subfields.some((subfield) => FIELD_STATUS_META[subfield.status].isOpen));
+  /*
+   * The summary is the run log, and the run log is where a clerk finds out what the run
+   * did *not* keep. A discarded candidate is the most interesting thing the merge does --
+   * a value whose quote was not on the page it named -- and saying nothing about it makes
+   * a silent loss look like a document that held nothing.
+   */
   const summary = [
     `${plural(plan.documents.length, "Datei", "Dateien")} gelesen`,
     `${plural(plan.pageCount, "Seite", "Seiten")}`,
     `${plural(candidatesWritten, "Fundstelle", "Fundstellen")}`,
+    ...(rejected.length === 0 ? [] : [`${rejected.length} Angaben verworfen`]),
+    ...(quotesAmbiguous === 0 ? [] : [`${quotesAmbiguous} Zitate nicht eindeutig`]),
     `${open.length} von ${reviewed.length} Feldern offen`,
   ].join(", ");
 
@@ -317,6 +331,7 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
     rowsTouched,
     findingsWritten,
     quotesLocated,
+    quotesAmbiguous,
     resolved,
     rejected,
     failures: allFailures,
