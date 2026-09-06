@@ -97,7 +97,8 @@ export async function addNoteAction(_previous: string | undefined, form: FormDat
 }
 
 /**
- * Opens a case and files whatever was pasted with it.
+ * Opens a case and files whatever came with it: the pasted text, and the files dropped on
+ * the form.
  *
  * Only the name is asked for. The address of the property is in the documents, so the
  * first run derives it; asking a clerk to retype what the Grundbuch already says is how
@@ -110,6 +111,10 @@ export async function createCaseAction(_previous: string | undefined, form: Form
   const caseId = await createCase({ name });
   const body = value(form, "text");
   if (body.trim() !== "") await fileText(caseId, value(form, "noteName"), body);
+  // An empty file input still submits one nameless, empty File; that one is not a document.
+  for (const file of form.getAll("files")) {
+    if (file instanceof File && file.size > 0) await ingestDocument(caseId, file.name, new Uint8Array(await file.arrayBuffer()));
+  }
   refresh();
   // Throws, so it has to come last: everything above must already be written.
   redirect(routes.case(caseId));

@@ -1,41 +1,82 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { Notice } from "@/components/ui/Notice";
 import { TonedIcon } from "@/components/ui/TonedIcon";
 import { Text } from "@/components/ui/Text";
 import type { Tone } from "@/domain/status";
 import type { IconName } from "@/components/ui/icons";
-import { ACCEPTED_EXTENSIONS } from "@/lib/documents";
 import { plural } from "@/lib/format";
+import { DropZone } from "./DropZone";
 import styles from "./UploadZone.module.css";
 
-interface UploadZoneProps {
-  caseId: string;
-  /** The button for text that arrives without a file, shown beside the picker. */
-  note?: ReactNode;
-}
+type Stage = "picked" | "uploading" | "stored" | "failed";
 
-type Stage = "uploading" | "stored" | "failed";
-
-interface Upload {
+export interface Upload {
   fileName: string;
   stage: Stage;
   note: string;
 }
 
 const STAGE_META: Record<Stage, { tone: Tone; icon: IconName }> = {
+  picked: { tone: "neutral", icon: "file-text" },
   uploading: { tone: "neutral", icon: "refresh-cw" },
   stored: { tone: "confirmed", icon: "circle-check" },
   failed: { tone: "missing", icon: "triangle-alert" },
 };
 
+/** One line per file: what happened to it, or what is about to. */
+export function UploadList({ uploads }: { uploads: readonly Upload[] }) {
+  if (uploads.length === 0) return null;
+  return (
+    <ul className={styles.list}>
+      {uploads.map((entry, index) => {
+        const meta = STAGE_META[entry.stage];
+        return (
+          <li key={`${index}-${entry.fileName}`} className={styles.item}>
+            <TonedIcon tone={meta.tone} name={meta.icon} size="sm" />
+            <span className={styles.name}>{entry.fileName}</span>
+            <Text variant="muted">{entry.note}</Text>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** The shape of our own import endpoint's answer; one file in, one entry back. */
 interface ImportResponse {
   error?: string;
   imported?: { attachedToExisting?: boolean; pageCount?: number }[];
+}
+
+/** Sends one file to the import endpoint and says what became of it. */
+const send = async (caseId: string, file: File): Promise<Upload> => {
+  try {
+    const body = new FormData();
+    body.append("file", file);
+    const response = await fetch(`/api/cases/${caseId}/documents`, { method: "POST", body });
+    const answer = (await response.json()) as ImportResponse;
+    const imported = answer.imported?.[0];
+    if (!response.ok || imported === undefined) {
+      return { fileName: file.name, stage: "failed", note: answer.error ?? `Antwort ${response.status}` };
+    }
+    const pages = imported.pageCount ?? 0;
+    const rendered = pages === 0 ? "kein lesbares Format, keine Seiten" : `${plural(pages, "Seite", "Seiten")} gerendert`;
+    return {
+      fileName: file.name,
+      stage: "stored",
+      note: imported.attachedToExisting === true ? `bereits im Vorgang, ${rendered}` : rendered,
+    };
+  } catch (error) {
+    return { fileName: file.name, stage: "failed", note: error instanceof Error ? error.message : "Upload fehlgeschlagen" };
+  }
+};
+
+interface UploadZoneProps {
+  caseId: string;
+  /** The button for text that arrives without a file, shown beside the picker. */
+  note?: ReactNode;
 }
 
 /**
@@ -51,39 +92,15 @@ interface ImportResponse {
  */
 export function UploadZone({ caseId, note }: UploadZoneProps) {
   const router = useRouter();
-  const input = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<readonly Upload[]>([]);
   const [busy, setBusy] = useState(false);
 
-  const send = async (file: File): Promise<Upload> => {
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      const response = await fetch(`/api/cases/${caseId}/documents`, { method: "POST", body });
-      const answer = (await response.json()) as ImportResponse;
-      const imported = answer.imported?.[0];
-      if (!response.ok || imported === undefined) {
-        return { fileName: file.name, stage: "failed", note: answer.error ?? `Antwort ${response.status}` };
-      }
-      const pages = imported.pageCount ?? 0;
-      const rendered = pages === 0 ? "kein lesbares Format, keine Seiten" : `${plural(pages, "Seite", "Seiten")} gerendert`;
-      return {
-        fileName: file.name,
-        stage: "stored",
-        note: imported.attachedToExisting === true ? `bereits im Vorgang, ${rendered}` : rendered,
-      };
-    } catch (error) {
-      return { fileName: file.name, stage: "failed", note: error instanceof Error ? error.message : "Upload fehlgeschlagen" };
-    }
-  };
-
   const upload = async (files: readonly File[]) => {
-    if (files.length === 0 || busy) return;
+    if (busy) return;
     setBusy(true);
     setUploads(files.map((file) => ({ fileName: file.name, stage: "uploading", note: "wird abgelegt …" })));
     for (const [index, file] of files.entries()) {
-      const result = await send(file);
+      const result = await send(caseId, file);
       setUploads((current) => current.map((entry, position) => (position === index ? result : entry)));
     }
     setBusy(false);
@@ -93,64 +110,17 @@ export function UploadZone({ caseId, note }: UploadZoneProps) {
   };
 
   return (
-    <div
-      className={[styles.zone, dragging ? styles.dragging : ""].join(" ")}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(event) => {
-        event.preventDefault();
-        setDragging(false);
-        void upload([...event.dataTransfer.files]);
-      }}
+    <DropZone
+      text={
+        busy
+          ? "Unterlagen werden abgelegt und seitenweise gerendert …"
+          : "Dateien hier ablegen, oder Text einfügen, der ohne Datei kam. Beides landet im nächsten Durchlauf."
+      }
+      busy={busy}
+      actions={note}
+      onFiles={(files) => void upload(files)}
     >
-      <Notice
-        tone="neutral"
-        icon="upload"
-        text={
-          busy
-            ? "Unterlagen werden abgelegt und seitenweise gerendert …"
-            : "Dateien hier ablegen, oder Text einfügen, der ohne Datei kam. Beides landet im nächsten Durchlauf."
-        }
-        surface="plain"
-        actions={
-          <>
-            {note}
-            <Button variant="secondary" icon="upload" onClick={() => input.current?.click()} disabled={busy}>
-              Datei auswählen
-            </Button>
-          </>
-        }
-      >
-        {uploads.length > 0 && (
-          <ul className={styles.list}>
-            {uploads.map((entry) => {
-              const meta = STAGE_META[entry.stage];
-              return (
-                <li key={entry.fileName} className={styles.item}>
-                  <TonedIcon tone={meta.tone} name={meta.icon} size="sm" />
-                  <span className={styles.name}>{entry.fileName}</span>
-                  <Text variant="muted">{entry.note}</Text>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Notice>
-      <input
-        ref={input}
-        className={styles.input}
-        type="file"
-        multiple
-        accept={ACCEPTED_EXTENSIONS}
-        onChange={(event) => {
-          void upload([...(event.target.files ?? [])]);
-          // Cleared so re-picking the same file after a failure fires onChange again.
-          event.target.value = "";
-        }}
-      />
-    </div>
+      <UploadList uploads={uploads} />
+    </DropZone>
   );
 }

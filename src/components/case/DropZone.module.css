@@ -1,0 +1,13 @@
+.zone {
+  border-radius: var(--radius);
+  outline: 2px dashed transparent;
+  outline-offset: 2px;
+  transition: outline-color 120ms ease;
+}
+.dragging {
+  outline-color: var(--color-border-strong);
+}
+
+.input {
+  display: none;
+}

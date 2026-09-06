@@ -41,9 +41,11 @@ Betrieb außerhalb des eigenen Rechners gehören dort ein eigenes Passwort und e
 ## Einen Vorgang anlegen
 
 **Neuer Vorgang** fragt nach einem Namen und nach dem, was bisher geschrieben wurde: der
-E-Mail des Maklers, einer Telefonnotiz, einem Nachtrag. Mehr nicht. Die Anschrift des
-Objekts wird nicht abgefragt — sie steht in den Unterlagen, und der erste Durchlauf trägt
-sie ein. Wer sie abtippt, schafft nur die zweite Stelle, an der sie falsch stehen kann.
+E-Mail des Maklers, einer Telefonnotiz, einem Nachtrag. Unterlagen, die schon da sind,
+können gleich mit abgelegt werden; sie werden wie im Unterlagen-Tab gespeichert und
+gerendert. Mehr nicht. Die Anschrift des Objekts wird nicht abgefragt — sie steht in den
+Unterlagen, und der erste Durchlauf trägt sie ein. Wer sie abtippt, schafft nur die zweite
+Stelle, an der sie falsch stehen kann.
 
 Der eingefügte Text wird **eine Unterlage wie jede andere**: unter dem Hash seiner Bytes
 abgelegt, zu einer Seite gemacht, vom nächsten Durchlauf gelesen. Deshalb bekommt ein Wert
