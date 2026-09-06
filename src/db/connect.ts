@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Pool, type PoolClient } from "pg";
 import { todayIso } from "@/lib/clock";
-import { seedIfEmpty } from "./seed";
 
 /**
  * The Postgres connection.
@@ -59,9 +58,10 @@ const createPool = () => {
 export const getPool = (): Pool => (cache.appPool ??= createPool());
 
 /**
- * Applies the schema and seeds an empty database, once per process. An advisory lock makes
- * it safe when several workers start at the same time: the second one waits, then finds
- * the tables already there and the sample case already written.
+ * Applies the schema once per process. An advisory lock makes it safe when several
+ * workers start at the same time: the second one waits, then finds the tables already
+ * there. Nothing is written -- a fresh database has no cases, and the first one is
+ * opened in the app.
  */
 const SETUP_LOCK = 8_150_412;
 
@@ -71,7 +71,6 @@ const setUp = async () => {
     await client.query("SELECT pg_advisory_lock($1)", [SETUP_LOCK]);
     try {
       await client.query(readFileSync(path.join(process.cwd(), SCHEMA_FILE), "utf8"));
-      await seedIfEmpty(client);
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [SETUP_LOCK]);
     }

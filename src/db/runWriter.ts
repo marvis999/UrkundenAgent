@@ -5,8 +5,10 @@ import { preferredCandidate } from "@/agent/merge";
 import type { DocumentFacts } from "@/agent/tasks/classifyDocument";
 import type { Findings } from "@/agent/tasks/writeFinding";
 import type { FieldId } from "@/domain/model";
+import { REQUEST_OUTCOME_META, type RequestOutcome } from "@/domain/status";
 import { nowIso } from "@/lib/clock";
-import { int, query, text, textOrNull, transaction, type Row } from "./connect";
+import { formatRun } from "@/lib/format";
+import { int, query, queryOne, text, textOrNull, transaction, type Row } from "./connect";
 
 /**
  * Everything a run writes.
@@ -48,6 +50,73 @@ const writeHistory = (
 /* ---------- The run row ---------- */
 
 /**
+ * The number a run started now would carry. An unfinished run is resumed rather than
+ * duplicated, so a crash halfway through does not leave a case with two runs claiming the
+ * same documents -- and the button, the progress strip and the run log all name it.
+ *
+ * Not the same question as which run a newly arrived document waits for; see
+ * `receivingRun` in files.ts, which parts ways with this one exactly while a run is in
+ * flight and has already fixed its plan.
+ */
+export const nextRunNumber = async (caseId: string): Promise<number> => {
+  const row = await queryOne(
+    `SELECT c.current_run, r.finished_at FROM case_file c
+     LEFT JOIN run r ON r.case_id = c.id AND r.number = c.current_run
+     WHERE c.id = $1`,
+    caseId,
+  );
+  if (row === undefined) return 0;
+  const current = int(row.current_run);
+  // current_run 0 means nothing has ever run, and the join found no row rather than an
+  // unfinished one; either way the first run is number 1.
+  return current > 0 && row.finished_at === null ? current : current + 1;
+};
+
+/**
+ * Documents waiting to be read: rendered, and not yet read by a finished run. Word for
+ * word the set `planRun` picks up, so the phase cannot promise a run something the run
+ * then skips.
+ */
+const AWAITING_RUN = `
+  SELECT 1 FROM document d
+  WHERE d.case_id = c.id
+    AND EXISTS (SELECT 1 FROM page p WHERE p.document_id = d.id)
+    AND NOT EXISTS (
+      SELECT 1 FROM run_document rd JOIN run r ON r.id = rd.run_id
+      WHERE rd.document_id = d.id AND r.finished_at IS NOT NULL)`;
+
+/**
+ * Moves the case to `eingang` when something is lying there for the next run.
+ *
+ * This is the step that closes the circle: without it a case stays in `pruefen` however
+ * many documents arrive, and the banner never offers the run that would read them. Only
+ * the resting phases move -- a run in flight keeps its progress strip -- and a case whose
+ * new files all turned out to be unrenderable stays where it was, because a run over them
+ * would read nothing.
+ *
+ * Called after every ingest and at the end of every run, which between them are the only
+ * two moments at which the answer can change.
+ */
+export const noteIntake = (caseId: string) =>
+  query(
+    `UPDATE case_file c SET phase = 'intake', changed_at = $2
+     WHERE c.id = $1 AND c.phase IN ('review', 'waiting') AND EXISTS (${AWAITING_RUN})`,
+    caseId,
+    nowIso(),
+  );
+
+/**
+ * Writes the address the run read off the documents, once.
+ *
+ * The case is opened with a name and nothing else; the address of the property is in the
+ * documents, so it arrives the way every other value does. Written only while the case
+ * has none, because after that a person may have corrected it and a later run must not
+ * quietly change what the file is called.
+ */
+export const notePropertyAddress = (caseId: string, address: string) =>
+  query("UPDATE case_file SET property = $2 WHERE id = $1 AND property = ''", caseId, address);
+
+/**
  * Opens the run and puts the case into the analysis phase, which is what makes the
  * progress strip appear. Repeating a run number resumes it rather than failing.
  */
@@ -68,13 +137,13 @@ export const startRun = async (caseId: string, number: number): Promise<string> 
     return runId;
   });
 
-export const finishRun = (
+export const finishRun = async (
   runId: string,
   caseId: string,
   summary: string,
   provenance: { model: string | null; promptVersion: string | null },
-) =>
-  transaction(async (client) => {
+) => {
+  await transaction(async (client) => {
     const pages = await one(client, "SELECT COALESCE(SUM(pages_read), 0) AS total FROM run_document WHERE run_id = $1", [runId]);
     await client.query(
       "UPDATE run SET finished_at = $1, pages_read = $2, summary = $3, model = $4, prompt_version = $5 WHERE id = $6",
@@ -82,6 +151,31 @@ export const finishRun = (
     );
     await client.query("UPDATE case_file SET phase = 'review', changed_at = $1 WHERE id = $2", [nowIso(), caseId]);
   });
+  // A document that arrived while the run was reading was not in its plan, so the case
+  // goes straight back to `eingang` rather than looking done with it lying there.
+  await noteIntake(caseId);
+};
+
+/**
+ * Ends a run that did not get to `finishRun`: cancelled by the clerk, or failed.
+ *
+ * `finished_at` deliberately stays null. That is what marks the run's documents unread,
+ * so starting again reads exactly the same set rather than skipping it -- the same
+ * property that makes a crashed run safe to repeat. Only the phase moves, because a case
+ * left in `analysis` shows a progress strip that will never fill.
+ */
+export const endAnalysis = async (caseId: string, note: string) => {
+  await transaction(async (client) => {
+    await client.query("UPDATE run SET summary = $1 WHERE case_id = $2 AND finished_at IS NULL", [note, caseId]);
+    await client.query("UPDATE case_file SET phase = 'review', changed_at = $1 WHERE id = $2 AND phase = 'analysis'", [
+      nowIso(),
+      caseId,
+    ]);
+  });
+  // Its documents are unread again, so the case belongs back in `eingang` and offers the
+  // run a second time rather than stranding the files it never got to.
+  await noteIntake(caseId);
+};
 
 /**
  * Reopens the case's current run, which makes its documents count as unread again.
@@ -209,6 +303,11 @@ const MAY_REPLACE_CHOICE = `
       AND NOT EXISTS (SELECT 1 FROM candidate c WHERE c.id = s.chosen_candidate_id AND c.tag = 'manual'))`;
 
 export interface CandidateReport {
+  /**
+   * Candidates this run put behind a value. Counted per candidate, not per inserted row:
+   * ids are derived from content, so reading the same page twice writes nothing the second
+   * time, and counting the insert would report a repeated run as having found nothing.
+   */
   readonly written: number;
   readonly rowsTouched: number;
   readonly subfieldsFilled: number;
@@ -260,8 +359,8 @@ export const saveCandidates = (
         sortOrder += 1;
         rowsTouched.add(rowId);
       }
-      const { rowCount } = await insert(candidate, null, rowId);
-      written += rowCount ?? 0;
+      await insert(candidate, null, rowId);
+      written += 1;
       await client.query(`UPDATE table_row SET chosen_candidate_id = $1 WHERE id = $2 AND chosen_candidate_id IS NULL`, [
         candidate.id,
         rowId,
@@ -274,8 +373,8 @@ export const saveCandidates = (
       if (candidate.subfieldKey === null) continue;
       const subfieldId = targets.subfieldIds.get(candidate.subfieldKey);
       if (subfieldId === undefined) continue;
-      const { rowCount } = await insert(candidate, subfieldId, null);
-      written += rowCount ?? 0;
+      await insert(candidate, subfieldId, null);
+      written += 1;
       bySubfield.set(subfieldId, [...(bySubfield.get(subfieldId) ?? []), candidate]);
     }
 
@@ -302,12 +401,17 @@ export const saveCandidates = (
  * Says why a subfield has no value, for every subfield a run looked for and did not find.
  * Without this the field shows `fehlt` with an empty source line, which reads as a bug
  * rather than as a finding.
+ *
+ * The note is rewritten rather than only filled in, because the reason changes: a case
+ * whose subfields said "noch keine Unterlagen im Vorgang" has had documents read by the
+ * time this runs, and leaving the old sentence under the value would date the finding to
+ * before the run that produced it.
  */
 export const noteAbsences = (caseId: string, note: string) =>
   query(
     `UPDATE subfield s SET absence_note = $2
      FROM field f WHERE f.id = s.field_id AND f.case_id = $1
-       AND s.chosen_candidate_id IS NULL AND s.absence_note IS NULL`,
+       AND s.chosen_candidate_id IS NULL AND s.absence_note IS DISTINCT FROM $2`,
     caseId,
     note,
   );
@@ -389,6 +493,85 @@ export const saveDerived = (caseId: string, run: number, derivation: DerivationW
       await writeHistory(client, targets.fieldId, { subfieldId }, run, `abgeleitet: ${derivation.value}`);
     }
   });
+
+/* ---------- The sent request, closed by the run that answered it ---------- */
+
+export interface ResolvedItem {
+  readonly fieldKey: FieldId;
+  readonly outcome: RequestOutcome;
+  readonly resolvedBy: string;
+}
+
+/** Values of a field that still have no source at all, and how many there are in total. */
+const WITHOUT_SOURCE = `
+  SELECT COUNT(*) FILTER (WHERE s.chosen_candidate_id IS NULL) AS without_source, COUNT(*) AS total
+  FROM subfield s WHERE s.field_id = $1`;
+
+/** Which files of this run produced anything for the field, subfields and rows alike. */
+const CONTRIBUTING_FILES = `
+  SELECT DISTINCT d.file_name
+  FROM candidate c
+  LEFT JOIN subfield s ON s.id = c.subfield_id
+  LEFT JOIN table_row t ON t.id = c.table_row_id
+  JOIN document d ON d.id = c.document_id
+  WHERE COALESCE(s.field_id, t.field_id) = $1 AND c.run = $2
+  ORDER BY d.file_name`;
+
+/**
+ * Records what a run did to each open position of the request that was sent.
+ *
+ * A position asks for a document, so it is measured by sources arriving and not by a
+ * person confirming: `erledigt` once no value of the field is without a source any more,
+ * `teilweise` when this run brought something but left values open, `offen` when the
+ * documents it read contributed nothing to that field. That is the difference between
+ * "the answer came" and "the answer was accepted", and only the first one is the
+ * recipient's doing.
+ *
+ * The file names stay on the position, because "wodurch wurde das erledigt" is the
+ * question the run log is asked next.
+ */
+export const resolveRequestItems = async (caseId: string, run: number): Promise<ResolvedItem[]> => {
+  const open = await query(
+    `SELECT ri.id, ri.field_id, f.key AS field_key
+     FROM request_item ri
+     JOIN request rq ON rq.id = ri.request_id
+     JOIN field f ON f.id = ri.field_id
+     WHERE rq.case_id = $1 AND rq.sent_at IS NOT NULL AND ri.outcome IS NULL
+     ORDER BY ri.sort_order`,
+    caseId,
+  );
+  if (open.length === 0) return [];
+
+  const resolved: ResolvedItem[] = [];
+  for (const item of open) {
+    const fieldId = text(item.field_id);
+    const [counts] = await query(WITHOUT_SOURCE, fieldId);
+    const files = (await query(CONTRIBUTING_FILES, fieldId, run)).map((row) => text(row.file_name));
+    const withoutSource = int(counts?.without_source);
+    const total = int(counts?.total);
+
+    const outcome: RequestOutcome = files.length === 0 ? "open" : withoutSource === 0 ? "done" : "partial";
+    const resolvedBy =
+      outcome === "open"
+        ? `${formatRun(run)}: nichts dazu in den neuen Unterlagen`
+        : outcome === "done"
+          ? files.join(", ")
+          : `${files.join(", ")}, ${withoutSource} von ${total} Werten weiter ohne Quelle`;
+
+    await transaction(async (client) => {
+      await client.query("UPDATE request_item SET outcome = $1, resolved_by = $2 WHERE id = $3", [
+        outcome,
+        resolvedBy,
+        text(item.id),
+      ]);
+      await writeHistory(client, fieldId, {}, run, `Anforderung ${REQUEST_OUTCOME_META[outcome].label}: ${resolvedBy}`);
+    });
+    resolved.push({ fieldKey: text(item.field_key) as FieldId, outcome, resolvedBy });
+  }
+  // The phase needs no help here: the case has been in `analysis` since `startRun`, and
+  // `finishRun` puts it back into review whether or not a request was waiting.
+  return resolved;
+};
 
 /** The chosen candidate of one subfield, for a derivation that reads from it. */
 export const chosenCandidate = async (

@@ -1,11 +1,15 @@
 // Imports original documents into a running app.
 //
 //   npm run import -- <case-id> <file> [<file> ...]
-//   npm run import -- 2026-0412 test_files/*.pdf test_files/*.jpg
+//   npm run import -- 2026-0001 test_files/*.pdf test_files/*.jpg
 //
-// The originals are confidential and are not part of this repository. They stay on the
-// machine that runs the app: this posts them to the local server, which stores them under
-// the data directory and attaches them to the document rows that already describe them.
+// The same door the Unterlagen tab uses, for a folder that is quicker to pass on the
+// command line than to drag in. The originals are confidential and are not part of this
+// repository: they stay on the machine that runs the app, which stores them under the
+// data directory and renders their pages.
+//
+// The case has to exist. Open it in the app first -- a case is more than a row, it is the
+// whole field catalog written out, and the app is where that happens.
 
 import { basename } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -37,10 +41,8 @@ if (!response.ok) {
 
 const { imported } = await response.json();
 for (const item of imported) {
-  console.log(`${item.attachedToExisting ? "zugeordnet" : "neu angelegt"}  ${item.fileName}  (${item.pageCount} Seiten gerendert)`);
+  console.log(`${item.attachedToExisting ? "schon vorhanden" : "neu angelegt"}  ${item.fileName}  (${item.pageCount} Seiten)`);
 }
 
 const { documents } = await fetch(endpoint).then((r) => r.json());
-const missing = documents.filter((d) => !d.hasFile);
-console.log(`\n${documents.length - missing.length} von ${documents.length} Unterlagen haben jetzt eine Datei.`);
-for (const document of missing) console.log(`  ohne Datei: ${document.fileName}`);
+console.log(`\n${documents.length} Unterlagen im Vorgang. Der nächste Durchlauf liest die neuen.`);

@@ -25,7 +25,7 @@ import { documentHeader, pageParts } from "./parts";
  * the worst case is that extraction looks at a page that turns out to hold nothing.
  */
 
-export const CLASSIFY_PROMPT_VERSION = "2026-09-06";
+export const CLASSIFY_PROMPT_VERSION = "2026-09-07";
 
 const PageRoleSchema = z.object({
   number: z.number().int().positive(),
@@ -47,6 +47,8 @@ export const ClassificationSchema = z.object({
   /** Only for photographed pages; null for a clean scan or a text PDF. */
   photoCaption: z.string().nullable(),
   photoHint: z.string().nullable(),
+  /** The address of the property, when the document names one. Not a value of the deed. */
+  propertyAddress: z.string().nullable(),
   pages: z.array(PageRoleSchema),
 });
 
@@ -62,6 +64,7 @@ export interface DocumentFacts {
   readonly subtitle: string;
   readonly photoCaption: string | null;
   readonly photoHint: string | null;
+  readonly propertyAddress: string | null;
 }
 
 /** Which fields each page can contribute to, by page number. */
@@ -113,6 +116,11 @@ und Datum.
 
 photoCaption und photoHint — nur wenn die Seiten abfotografiert sind: eine kurze Bildunter-
 schrift und ein Hinweis, was die Lesung erschwert. Sonst beide null.
+
+propertyAddress — die Anschrift des Objekts, um das es in diesem Dokument geht: Straße,
+Hausnummer, Postleitzahl und Ort in einer Zeile. Das ist kein Wert der Urkunde, sondern
+der Name, unter dem das Notariat die Akte führt. Nur wenn die Anschrift im Dokument steht;
+eine Gemarkung oder ein Flurstück ist keine Anschrift. Sonst null.
 
 pages — für jede Seite, die du bekommen hast, genau ein Eintrag:
   number     die Seitenzahl, wie sie im Seitenkopf steht
@@ -221,6 +229,7 @@ export const classifyDocument = async (
         subtitle: call.value.subtitle,
         photoCaption: call.value.photoCaption,
         photoHint: call.value.photoHint,
+        propertyAddress: call.value.propertyAddress,
       };
     }
     for (const page of call.value.pages) {

@@ -1,7 +1,5 @@
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { Notice } from "@/components/ui/Notice";
 import { Page, Stack } from "@/components/ui/layout";
 import { PageTitle } from "@/components/ui/PageTitle";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -12,9 +10,13 @@ import { Text } from "@/components/ui/Text";
 import { documentPageCount, photoCount } from "@/domain/evidence";
 import type { CaseView, Document } from "@/domain/model";
 import { DOCUMENT_KIND_ICON, DOCUMENT_STATUS_META } from "@/domain/status";
-import { formatFiles, formatPages } from "@/lib/format";
+import { formatFiles, formatPages, formatRun } from "@/lib/format";
 import { routes } from "@/lib/routes";
+import { AddNote } from "./AddNote";
+import { AnalysisStrip } from "./AnalysisStrip";
 import { RunLogEntry } from "./RunLogEntry";
+import { StartRun } from "./RunControl";
+import { UploadZone } from "./UploadZone";
 import styles from "./DocumentList.module.css";
 
 const documentColumns: readonly Column<Document>[] = [
@@ -46,28 +48,36 @@ interface DocumentListProps {
   view: CaseView;
 }
 
-/** The Unterlagen tab: files, upload zone, run log. */
+/** The Unterlagen tab: files, upload zone, run log. Where a run is started and watched. */
 export function DocumentList({ view }: DocumentListProps) {
   const { documents, runs } = view;
   const summary = `${formatFiles(documents.length)}, ${formatPages(documentPageCount(documents))}, ${photoCount(documents)} davon Fotos`;
+  const analysing = view.case.phase === "analysis";
+  // Documents waiting for a run that has not finished. The button appears only when there
+  // is something for it to read, so the tab never offers a run over nothing.
+  const waiting = documents.filter((d) => d.isNew === true);
 
   return (
     <Page>
-      <PageTitle summary={summary}>Unterlagen</PageTitle>
+      <PageTitle
+        summary={summary}
+        actions={
+          !analysing && waiting.length > 0 ? (
+            <StartRun caseId={view.case.id} label={`${formatRun(view.case.nextRun)} starten`} />
+          ) : undefined
+        }
+      >
+        Unterlagen
+      </PageTitle>
+      {analysing && <AnalysisStrip view={view} />}
       <Table
         columns={documentColumns}
         rows={documents}
         rowKey={(d) => d.id}
         rowHref={(d) => routes.document(view.case.id, d.id)}
-        emptyText="Noch keine Unterlagen. Legen Sie Dateien ab, um den ersten Durchlauf zu starten."
+        emptyText="Noch keine Unterlagen. Dateien unten ablegen oder Text einfügen — danach lässt sich der erste Durchlauf starten."
       />
-      <Notice
-        tone="neutral"
-        icon="upload"
-        text="Weitere Unterlagen hier ablegen. Sie landen im nächsten Durchlauf."
-        surface="plain"
-        actions={<Button variant="secondary">Auswählen</Button>}
-      />
+      <UploadZone caseId={view.case.id} note={<AddNote caseId={view.case.id} />} />
       <Stack gap="tight">
         <SectionHeading>Durchläufe</SectionHeading>
         {runs.length === 0 && <Text variant="muted">Noch kein Durchlauf.</Text>}

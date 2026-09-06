@@ -28,8 +28,13 @@ const clip = (text: string) =>
 
 export const hasText = (page: PlannedPage) => page.text.trim() !== "";
 
+/**
+ * Text wins wherever there is any: a note has only text, and a PDF page with a text layer
+ * yields a quote the merge can verify, which an image never does. `planRun` drops pages
+ * with neither, so the image branch always has a path.
+ */
 export const pagePart = (page: PlannedPage): PromptPart =>
-  hasText(page)
+  hasText(page) || page.imagePath === null
     ? { kind: "text", text: `--- Seite ${page.number} (Textebene) ---\n${clip(page.text)}` }
     : {
         kind: "image",

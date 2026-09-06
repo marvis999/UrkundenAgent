@@ -7,19 +7,23 @@ import { DERIVATIONS } from "./derived";
 import { classifyDocument, CLASSIFY_PROMPT_VERSION, type ClassifyResult, type DocumentFacts } from "./tasks/classifyDocument";
 import { extractCandidates, inCalls, EXTRACT_PROMPT_VERSION, type OfferedPage } from "./tasks/extractCandidates";
 import { writeFinding, FINDING_PROMPT_VERSION } from "./tasks/writeFinding";
+import { locateDocumentQuotes } from "@/db/pages";
 import {
   chosenCandidate,
   finishRun,
   noteAbsences,
+  notePropertyAddress,
   recordProgress,
+  resolveRequestItems,
   saveCandidates,
   saveDerived,
   saveDocumentFacts,
   saveFindings,
   startRun,
+  type ResolvedItem,
 } from "@/db/runWriter";
 import type { FieldId } from "@/domain/model";
-import { FIELD_STATUS_META } from "@/domain/status";
+import { FIELD_STATUS_META, REQUEST_OUTCOME_META } from "@/domain/status";
 import { canonicalize } from "@/domain/value";
 import { todayIso } from "@/lib/clock";
 import { plural } from "@/lib/format";
@@ -48,6 +52,14 @@ import { plural } from "@/lib/format";
 
 const ABSENCE_NOTE = "in den Unterlagen nicht enthalten";
 
+/** Thrown when the clerk stops a run, so the caller can log it as a decision, not a fault. */
+export class RunCancelled extends Error {
+  constructor() {
+    super("Durchlauf abgebrochen");
+    this.name = "RunCancelled";
+  }
+}
+
 export interface RunOptions {
   readonly provider?: LlmProvider;
   /** ISO today. Passed through to every stage so a run is reproducible. */
@@ -66,6 +78,9 @@ export interface RunReport {
   readonly subfieldsFilled: number;
   readonly rowsTouched: number;
   readonly findingsWritten: number;
+  /** Quotes that could be pinned to one place on their page and so carry a marker. */
+  readonly quotesLocated: number;
+  readonly resolved: readonly ResolvedItem[];
   readonly rejected: readonly RejectedCandidate[];
   readonly failures: readonly string[];
   readonly skipped: RunPlan["skipped"];
@@ -105,6 +120,16 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
   const signal = options.signal;
   const say = options.onProgress ?? (() => {});
 
+  /*
+   * Checked between stages, not inside them. A cancelled call fails like any other and is
+   * collected rather than thrown, so without this a cancelled run would walk through every
+   * remaining stage failing each one and then finish -- marking its documents read. Here
+   * the run stops with the run row still open, and starting again reads the same set.
+   */
+  const stopIfCancelled = () => {
+    if (signal?.aborted === true) throw new RunCancelled();
+  };
+
   const plan = await planRun(caseId);
   const runId = await startRun(caseId, plan.number);
   say(`Durchlauf ${plan.number}: ${plural(plan.documents.length, "Datei", "Dateien")}, ${plural(plan.pageCount, "Seite", "Seiten")}`);
@@ -134,8 +159,27 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
   }
   const documentDate = (documentId: string) => facts.get(documentId)?.docDate ?? null;
 
+  /*
+   * The address the case is filed under: the first document that names one, in the order
+   * the case holds them -- which is the order they arrived, so it is normally the note or
+   * the e-mail the case was opened with.
+   *
+   * Deliberately not ranked by source class. A register is authoritative about ownership,
+   * not about postal addresses: it identifies a plot by Gemarkung and Flurstück, and where
+   * a street does appear it is on a scanned form read by a vision model. Preferring it
+   * traded "Beispielweg 1, 12345 Beispielstadt" for a misread postcode. This is the
+   * name of the file, not a value of the deed, and it is written once -- see
+   * `notePropertyAddress`.
+   */
+  const address = plan.documents.map((document) => facts.get(document.id)?.propertyAddress).find((value) => value != null);
+  if (address != null) {
+    await notePropertyAddress(caseId, address);
+    say(`  Objekt: ${address}`);
+  }
+
   /* ---------- 2. Extract ---------- */
 
+  stopIfCancelled();
   const byField = routePages(plan.documents, classified);
   const jobs = [...byField].flatMap(([fieldKey, offered]) =>
     inCalls(offered).map((chunk) => ({ fieldKey, chunk })),
@@ -155,6 +199,7 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
 
   /* ---------- Merge: the checks the code owns ---------- */
 
+  stopIfCancelled();
   const rejected: RejectedCandidate[] = [];
   let candidatesWritten = 0;
   let subfieldsFilled = 0;
@@ -180,6 +225,25 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
     rowsTouched += report.rowsTouched;
   }
 
+  /* ---------- Marking the quotes on the page ---------- */
+
+  /*
+   * Now that the quotes are rows, each one is looked up in the page it names and turned
+   * into a region on the page image. It happens here and not at ingest because at ingest
+   * there is nothing to locate yet, and not in the model call because the model is never
+   * asked where something sits -- only what it read. A quote that is found exactly once
+   * gets a marker; one that is found twice pins nothing and gets none.
+   */
+  let quotesLocated = 0;
+  const locateResults = await inParallel(
+    plan.documents,
+    async (document) => locateDocumentQuotes(caseId, document.id),
+    limit,
+  );
+  allFailures.push(...failures(locateResults, (index) => `Fundstellen markieren ${plan.documents[index]?.fileName ?? "?"}`));
+  for (const result of fulfilled(locateResults)) quotesLocated += result.quotesLocated;
+  say(`  ${plural(quotesLocated, "Fundstelle", "Fundstellen")} auf der Seite markiert`);
+
   /* ---------- Derived values ---------- */
 
   for (const derivation of DERIVATIONS) {
@@ -204,6 +268,7 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
 
   /* ---------- 3. Findings, on the status the rules computed ---------- */
 
+  stopIfCancelled();
   const reviewed = await reviewCase(caseId, today);
   const needsFinding = reviewed.filter((field) =>
     field.subfields.some((subfield) => FIELD_STATUS_META[subfield.status].hasFinding),
@@ -220,6 +285,11 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
   );
   allFailures.push(...failures(findingResults, (index) => `Befund ${needsFinding[index]?.fieldKey ?? "?"}`));
   const findingsWritten = fulfilled(findingResults).reduce((sum, count) => sum + count, 0);
+
+  /* ---------- What the run did to the open request ---------- */
+
+  const resolved = await resolveRequestItems(caseId, plan.number);
+  for (const item of resolved) say(`  Anforderung ${item.fieldKey}: ${REQUEST_OUTCOME_META[item.outcome].label}`);
 
   /* ---------- Close ---------- */
 
@@ -246,6 +316,8 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
     subfieldsFilled,
     rowsTouched,
     findingsWritten,
+    quotesLocated,
+    resolved,
     rejected,
     failures: allFailures,
     skipped: plan.skipped,

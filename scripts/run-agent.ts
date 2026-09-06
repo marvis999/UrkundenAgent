@@ -82,10 +82,15 @@ const main = async () => {
   console.log(`Fundstellen: ${report.candidatesWritten}`);
   console.log(`Unterfelder befüllt: ${report.subfieldsFilled}`);
   console.log(`Tabellenzeilen: ${report.rowsTouched}`);
+  console.log(`Markiert   : ${report.quotesLocated} Zitate auf der Seite lokalisiert`);
   console.log(`Befunde    : ${report.findingsWritten}`);
   console.log(`Dauer      : ${Math.round((Date.now() - started) / 1000)} s`);
   console.log(`Protokoll  : ${report.summary}`);
 
+  if (report.resolved.length > 0) {
+    console.log(`\nAnforderung (${report.resolved.length}):`);
+    for (const item of report.resolved) console.log(`  ${item.fieldKey}: ${item.outcome} — ${item.resolvedBy}`);
+  }
   if (report.rejected.length > 0) {
     console.log(`\nVerworfen (${report.rejected.length}):`);
     for (const item of report.rejected) console.log(`  ${item.fieldKey}.${item.target}: ${item.reason}`);

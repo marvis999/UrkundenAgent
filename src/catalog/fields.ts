@@ -5,10 +5,14 @@ import { plural } from "@/lib/format";
 /**
  * The field catalog: the ten fields of the deed and the subfields they consist of.
  *
- * This is the authority, not the database. Every case is seeded from it, so the shape
- * is identical everywhere and a subfield can be addressed by a stable key across runs.
- * Cases record the version they were seeded with, so an older case keeps its shape when
- * the catalog grows.
+ * This is the authority, not the database. Every case is built from it when it is opened,
+ * so the shape is identical everywhere and a subfield can be addressed by a stable key
+ * across runs. Cases record the version they were opened with, so an older case keeps its
+ * shape when the catalog grows.
+ *
+ * The request templates here state the general case: what this kind of field always needs
+ * before it is usable. What *this* case is missing is written by a run, which overrides
+ * them per field -- so nothing here may name a party, a date or an amount.
  */
 
 export const CATALOG_VERSION = "2026-09-01";
@@ -123,7 +127,7 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     ],
     request: {
       title: "Handelsregisterauszug und Vertretungsnachweis der Käuferin",
-      text: "Für die Beispiel Wohnbau GmbH: aktueller HRB-Auszug, Vertretungsnachweis, Geschäftsanschrift.",
+      text: "Aktueller Registerauszug, Nachweis der Vertretungsberechtigung und Geschäftsanschrift der Käuferin.",
     },
     summary: ({ value }) => join(value("company")),
   },
@@ -139,7 +143,7 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     ],
     request: {
       title: "Aktueller Grundbuchauszug",
-      text: "Der vorliegende Auszug datiert vom 15.11.2011 und ist für die Beurkundung nicht verwendbar.",
+      text: "Beglaubigter Auszug neueren Datums mit Aufschrift, Bestandsverzeichnis und den Abteilungen I bis III.",
     },
     summary: ({ value }) => join(prefixed("AG ", value("court")), value("registerOf"), prefixed("Blatt ", value("sheet"))),
   },
@@ -166,7 +170,7 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     ],
     request: {
       title: "Schriftliche Bestätigung des Kaufpreises",
-      text: "Die E-Mail vom 02.09.2026 nennt im Text 2.100.000 EUR und im Nachtrag 2.060.000 EUR. Wir führen bis zu Ihrer Bestätigung 2.060.000 EUR.",
+      text: "Bestätigung beider Parteien über den vereinbarten Betrag, damit er nicht nur als Angabe im Schriftverkehr vorliegt.",
     },
     summary: ({ value }) => join(value("digits")),
   },
@@ -181,7 +185,7 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     ],
     request: {
       title: "Finanzierungsbestätigung der Bank",
-      text: "Bestätigung der Beispielbank über Gläubigerin und Grundschuldbetrag von 1.650.000 EUR.",
+      text: "Bestätigung des finanzierenden Instituts über Gläubigerin und Höhe der zu bestellenden Grundschuld.",
     },
     summary: ({ value }) => join(value("creditor"), value("chargeAmount")),
   },
@@ -214,7 +218,7 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     ],
     request: {
       title: "Mietverträge und aktuelle Flächenaufstellung",
-      text: "Die Mietverträge nebst Nachträgen. Die Jahresnettomiete liegt bisher nur als Übersicht vor, die Fläche nur als Architektenberechnung von 1991.",
+      text: "Sämtliche Mietverträge nebst Nachträgen sowie eine aktuelle Aufstellung der Flächen und der Jahresnettomiete.",
     },
     summary: ({ value }) => join(value("transfer"), suffixed(value("annualRent"), " p. a.")),
   },
@@ -230,7 +234,7 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     ],
     request: {
       title: "Gültiger Energieausweis",
-      text: "Der vorliegende Verbrauchsausweis vom 13.04.2016 ist am 12.04.2026 abgelaufen.",
+      text: "Energieausweis mit Art, Kennwert und Gültigkeitsdatum, gültig am Tag der Beurkundung.",
     },
     summary: ({ value }) => join(value("type"), prefixed("gültig bis ", value("validity"))),
   },
@@ -245,7 +249,7 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     ],
     request: {
       title: "Bestätigung des Übergabetermins",
-      text: "Geplant ist der 01.12.2026, spätestens zwei Wochen nach vollständiger Kaufpreiszahlung. Bitte von beiden Parteien bestätigen lassen.",
+      text: "Von beiden Parteien bestätigtes Datum des Besitzübergangs und die Regelung, die daran hängt.",
     },
     summary: ({ value }) => join(value("date")),
   },

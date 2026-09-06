@@ -72,6 +72,7 @@ const FACTS: DocumentFacts = {
   subtitle: "Amtsgericht Musterstadt",
   photoCaption: null,
   photoHint: null,
+  propertyAddress: "Beispielweg 1, 12345 Beispielheide",
 };
 
 const raw = (over: Partial<RawCandidate> = {}): RawCandidate => ({

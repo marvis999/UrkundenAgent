@@ -1,5 +1,6 @@
 import path from "node:path";
-import { documentsDirectory, int, query, queryOne, text, textOrNull, type Row } from "@/db/connect";
+import { documentsDirectory, int, query, text, textOrNull, type Row } from "@/db/connect";
+import { nextRunNumber } from "@/db/runWriter";
 import type { DocumentKind } from "@/domain/status";
 
 /**
@@ -16,8 +17,11 @@ import type { DocumentKind } from "@/domain/status";
 
 export interface PlannedPage {
   readonly number: number;
-  /** Absolute path to the rendered PNG, ready to hand to the model as an image part. */
-  readonly imagePath: string;
+  /**
+   * Absolute path to the rendered PNG, null for a page that was never a picture: a note
+   * or an e-mail is text and nothing else.
+   */
+  readonly imagePath: string | null;
   readonly width: number;
   readonly height: number;
   /**
@@ -50,23 +54,6 @@ export interface RunPlan {
 }
 
 /**
- * The number of the run to start. An unfinished run is resumed, so a crash halfway
- * through does not leave a case with two runs that both claim the same documents.
- */
-const runNumber = async (caseId: string): Promise<number> => {
-  const row = await queryOne(
-    `SELECT c.current_run, r.finished_at FROM case_file c
-     LEFT JOIN run r ON r.case_id = c.id AND r.number = c.current_run
-     WHERE c.id = $1`,
-    caseId,
-  );
-  if (row === undefined) return 0;
-  const current = int(row.current_run);
-  // current_run 0 means nothing has ever run; the first run is number 1.
-  return current > 0 && row.finished_at === null ? current : current + 1;
-};
-
-/**
  * Documents this run has to read: those with rendered pages that no finished run has
  * read yet. Stated that way rather than by arrival date, the set is idempotent -- a run
  * that failed and is started again reads exactly the same documents, and a run that
@@ -83,17 +70,26 @@ const UNREAD_DOCUMENTS = `
     )
   ORDER BY d.sort_order`;
 
-const toPage = (row: Row): PlannedPage => ({
-  number: int(row.number),
-  imagePath: path.join(documentsDirectory(), text(row.image_path)),
-  width: int(row.width),
-  height: int(row.height),
-  text: text(row.text),
-});
+const toPage = (row: Row): PlannedPage => {
+  const imagePath = textOrNull(row.image_path);
+  return {
+    number: int(row.number),
+    imagePath: imagePath === null ? null : path.join(documentsDirectory(), imagePath),
+    width: int(row.width),
+    height: int(row.height),
+    text: text(row.text),
+  };
+};
+
+/**
+ * A page a run can do something with: it has text to read, or an image to look at.
+ * One with neither would reach the model as nothing and come back as nothing.
+ */
+const isReadable = (page: PlannedPage) => page.text.trim() !== "" || page.imagePath !== null;
 
 export const planRun = async (caseId: string): Promise<RunPlan> => {
   const [number, documentRows, pageRows] = await Promise.all([
-    runNumber(caseId),
+    nextRunNumber(caseId),
     query(UNREAD_DOCUMENTS, caseId),
     query(
       `SELECT p.document_id, p.number, p.image_path, p.width, p.height, p.text
@@ -116,9 +112,9 @@ export const planRun = async (caseId: string): Promise<RunPlan> => {
   for (const row of documentRows) {
     const id = text(row.id);
     const fileName = text(row.file_name);
-    const pages = pagesByDocument.get(id);
+    const pages = pagesByDocument.get(id)?.filter(isReadable);
     if (pages === undefined || pages.length === 0) {
-      skipped.push({ fileName, reason: "noch keine Seiten gerendert" });
+      skipped.push({ fileName, reason: "keine lesbaren Seiten" });
       continue;
     }
     documents.push({ id, fileName, kind: textOrNull(row.kind) as DocumentKind, pages });

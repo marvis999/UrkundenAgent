@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { cancelRunAction } from "@/app/actions";
+import { ActionForm } from "@/components/ui/ActionForm";
 import { Badge } from "@/components/ui/Badge";
 import { Button, type ButtonVariant } from "@/components/ui/Button";
 import { Notice } from "@/components/ui/Notice";
@@ -7,17 +9,47 @@ import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { Text } from "@/components/ui/Text";
 import { TopBar, UserChip } from "@/components/ui/TopBar";
 import { workspace } from "@/data/workspace";
-import { deriveBanner, type ActionEmphasis } from "@/domain/derive";
+import { deriveBanner, type ActionEmphasis, type BannerAction } from "@/domain/derive";
 import type { CaseView } from "@/domain/model";
 import { CASE_STATUS_META } from "@/domain/status";
 import { formatFiles } from "@/lib/format";
 import { routes } from "@/lib/routes";
+import { AutoRefresh } from "./AutoRefresh";
+import { StartRun } from "./RunControl";
 import styles from "./CaseChrome.module.css";
 
 const ACTION_VARIANT: Record<ActionEmphasis, ButtonVariant> = {
   primary: "accent",
   strong: "dark",
   quiet: "translucent",
+};
+
+/**
+ * One banner button. Most of them navigate, so they are links; the two that drive the
+ * run itself submit instead, because starting and cancelling a run are writes and a link
+ * that writes is a link that a browser may follow on its own.
+ */
+const renderAction = (caseId: string, action: BannerAction, iconSide: "start" | "end") => {
+  const variant = ACTION_VARIANT[action.emphasis];
+  if (action.run === "start") return <StartRun caseId={caseId} label={action.label} variant={variant} />;
+  if (action.run === "cancel") {
+    return (
+      <ActionForm action={cancelRunAction} values={{ case: caseId }}>
+        <Button variant={variant} icon={action.icon} submit>
+          {action.label}
+        </Button>
+      </ActionForm>
+    );
+  }
+  return (
+    <Button
+      variant={variant}
+      {...(iconSide === "end" ? { iconEnd: action.icon } : { icon: action.icon })}
+      href={action.href}
+    >
+      {action.label}
+    </Button>
+  );
 };
 
 interface CaseChromeProps {
@@ -74,18 +106,14 @@ export function CaseChrome({ view, children }: CaseChromeProps) {
           attached
           actions={
             <>
-              {banner.secondary && (
-                <Button variant={ACTION_VARIANT[banner.secondary.emphasis]} icon={banner.secondary.icon} href={banner.secondary.href}>
-                  {banner.secondary.label}
-                </Button>
-              )}
-              <Button variant={ACTION_VARIANT[banner.action.emphasis]} iconEnd={banner.action.icon} href={banner.action.href}>
-                {banner.action.label}
-              </Button>
+              {banner.secondary && renderAction(c.id, banner.secondary, "start")}
+              {renderAction(c.id, banner.action, "end")}
             </>
           }
         />
       </div>
+      {/* Only while a run is in flight; a case at rest polls nothing. */}
+      {c.phase === "analysis" && <AutoRefresh />}
       {children}
     </div>
   );

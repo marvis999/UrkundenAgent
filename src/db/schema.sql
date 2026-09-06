@@ -70,12 +70,19 @@ CREATE TABLE IF NOT EXISTS page (
   id          text PRIMARY KEY,
   document_id text NOT NULL REFERENCES document(id) ON DELETE CASCADE,
   number      integer NOT NULL,
-  image_path  text NOT NULL,
+  -- NULL for a document that is text and was never a picture of anything: a pasted note
+  -- or an e-mail. Such a page has its text and nothing to look at, and a candidate from
+  -- it carries a quote instead of a rectangle.
+  image_path  text,
   width       integer NOT NULL,
   height      integer NOT NULL,
   text        text NOT NULL DEFAULT '',
   UNIQUE (document_id, number)
 );
+
+-- image_path was NOT NULL before text documents existed. Stated as an idempotent ALTER so
+-- an existing database picks the change up on the next start, without a reset.
+ALTER TABLE page ALTER COLUMN image_path DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS field (
   id         text PRIMARY KEY,

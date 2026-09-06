@@ -16,10 +16,12 @@ interface DocumentViewerProps {
   view: CaseView;
   document: Document;
   page: number;
+  /** The page's own text, for a document that is text and has no image to show. */
+  text?: string;
 }
 
 /** Modal viewer: photos as image with marker, text pages with the highlighted passage. */
-export function DocumentViewer({ view, document, page: requestedPage }: DocumentViewerProps) {
+export function DocumentViewer({ view, document, page: requestedPage, text: pageText }: DocumentViewerProps) {
   const caseId = view.case.id;
   const page = clampPage(requestedPage, document.pageCount);
   const hits = pagesWithEvidence(view, document.id);
@@ -80,18 +82,25 @@ export function DocumentViewer({ view, document, page: requestedPage }: Document
           ) : (
             <div className={styles.sheet}>
               <div className={styles.sheetHeader}>
-                <Text variant="strong">{document.title}</Text>
+                <Text variant="strong">{document.title || document.fileName}</Text>
                 <Text variant="muted">{document.subtitle}</Text>
               </div>
-              <div className={styles.lines} />
+              {/* A note is shown as what it is. Everything else has no page to show yet. */}
+              {pageText === undefined ? (
+                <>
+                  <div className={styles.lines} />
+                  <div className={styles.lines} />
+                  <div className={[styles.lines, styles.short].join(" ")} />
+                </>
+              ) : (
+                <p className={styles.text}>{pageText}</p>
+              )}
               {located?.candidate.quote && (
                 <div className={styles.hit}>
                   <span className={styles.hitLabel}>Fundstelle</span>
                   <span>{located.candidate.quote}</span>
                 </div>
               )}
-              <div className={styles.lines} />
-              <div className={[styles.lines, styles.short].join(" ")} />
             </div>
           )}
         </div>

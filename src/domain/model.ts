@@ -199,7 +199,12 @@ export interface Case {
   status: CaseStatus;
   changedAt: string;
   phase: Phase;
-  currentRun: number;
+  /**
+   * The run the case is in or about to start: the unfinished run while one is in flight,
+   * otherwise the next number. Every "Durchlauf N" on screen is this one, so the button
+   * that starts a run and the strip that shows it running name the same number.
+   */
+  nextRun: number;
 }
 
 /** Everything a case view needs. */

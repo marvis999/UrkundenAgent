@@ -86,11 +86,12 @@ export const DOCUMENT_STATUS_META: Record<DocumentStatus, StatusMeta> = {
 
 /* ---------- Document kind (drives the file icon) ---------- */
 
-export const DOCUMENT_KINDS = ["email", "scan", "photo", "table", "register"] as const;
+export const DOCUMENT_KINDS = ["email", "note", "scan", "photo", "table", "register"] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
 export const DOCUMENT_KIND_ICON: Record<DocumentKind, IconName> = {
   email: "mail",
+  note: "sticky-note",
   scan: "file-text",
   photo: "image",
   table: "table",

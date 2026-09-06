@@ -222,8 +222,10 @@ const loadRows = async (caseId: string | null) => {
         caseId,
       ),
       query(
+        // Only pages that are actually a picture of something: a note has pages and no
+        // image, and asking the page route for one would give the viewer a broken frame.
         `SELECT d.case_id, p.document_id, COUNT(*) AS total FROM page p JOIN document d ON d.id = p.document_id
-         WHERE ${scope("d.case_id")} GROUP BY d.case_id, p.document_id`,
+         WHERE ${scope("d.case_id")} AND p.image_path IS NOT NULL GROUP BY d.case_id, p.document_id`,
         caseId,
       ),
     ]);
@@ -410,6 +412,10 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
   const runRows = forCase(rows.runs);
   const finishedRuns = runRows.filter((row) => timestampOrNull(row.finished_at) !== null).map((row) => int(row.number));
   const lastFinishedRun = finishedRuns.length === 0 ? 0 : Math.max(...finishedRuns);
+  // Read from the run rows rather than from `current_run`, which names the run that was
+  // started last and so points one behind while that run is still going.
+  const unfinishedRun = runRows.find((row) => timestampOrNull(row.finished_at) === null);
+  const nextRun = unfinishedRun === undefined ? lastFinishedRun + 1 : int(unfinishedRun.number);
 
   const documentRows = forCase(rows.documents);
   const documentKeys = new Map(documentRows.map((row) => [text(row.id), unscope(caseId, text(row.id))]));
@@ -472,7 +478,7 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
       status: caseStatus(fields, documents, phase),
       changedAt: formatChangedAt(timestampOrNull(caseRow.changed_at) ?? "", today),
       phase,
-      currentRun: int(caseRow.current_run),
+      nextRun,
     },
     fields,
     groups: FIELD_GROUPS,

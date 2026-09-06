@@ -21,7 +21,7 @@ export function AnalysisStrip({ view }: AnalysisStripProps) {
     <Notice
       tone="neutral"
       icon="refresh-cw"
-      title={`${formatRun(view.case.currentRun + 1)} läuft`}
+      title={`${formatRun(view.case.nextRun)} läuft`}
       text={`${pagesRead} von ${pagesTotal} Seiten gelesen`}
       surface="plain"
     >

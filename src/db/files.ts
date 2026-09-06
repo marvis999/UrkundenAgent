@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileType } from "@/lib/documents";
 import { documentsDirectory, int, query, queryOne, text, textOrNull } from "./connect";
 import { renderDocumentPages } from "./pages";
+import { noteIntake } from "./runWriter";
 
 /**
  * Original documents on disk.
@@ -17,19 +19,6 @@ import { renderDocumentPages } from "./pages";
  * importing the same file twice stores it once.
  */
 
-const EXTENSION_KIND: Readonly<Record<string, { kind: string; contentType: string }>> = {
-  ".pdf": { kind: "scan", contentType: "application/pdf" },
-  ".jpg": { kind: "photo", contentType: "image/jpeg" },
-  ".jpeg": { kind: "photo", contentType: "image/jpeg" },
-  ".png": { kind: "photo", contentType: "image/png" },
-  ".eml": { kind: "email", contentType: "message/rfc822" },
-  ".txt": { kind: "email", contentType: "text/plain; charset=utf-8" },
-};
-
-const FALLBACK = { kind: "scan", contentType: "application/octet-stream" } as const;
-
-const describe = (fileName: string) => EXTENSION_KIND[path.extname(fileName).toLowerCase()] ?? FALLBACK;
-
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 /**
@@ -40,18 +29,17 @@ const storagePath = (caseId: string, hash: string, fileName: string) =>
   path.posix.join(caseId, `${hash}${path.extname(fileName).toLowerCase()}`);
 
 /**
- * A document that arrives after the current run has finished belongs to the next one:
- * that is what makes it show as new until a run has read it.
+ * The run that will read a document arriving now, which is what makes it show as new
+ * until one has.
+ *
+ * Deliberately not `nextRunNumber`: that one resumes an unfinished run, and a run in
+ * flight settled which documents it reads when it planned itself. A file dropped while it
+ * is running belongs to the run after it, however few seconds separate the two.
  */
 const receivingRun = async (caseId: string): Promise<number> => {
-  const row = await queryOne(
-    `SELECT c.current_run, r.finished_at FROM case_file c
-     LEFT JOIN run r ON r.case_id = c.id AND r.number = c.current_run
-     WHERE c.id = $1`,
-    caseId,
-  );
-  const current = int(row?.current_run);
-  return row?.finished_at === null ? current : current + 1;
+  const row = await queryOne("SELECT current_run FROM case_file WHERE id = $1", caseId);
+  // current_run is 0 until something has run, so the first arrival waits for run 1.
+  return int(row?.current_run) + 1;
 };
 
 export interface IngestResult {
@@ -63,15 +51,17 @@ export interface IngestResult {
 }
 
 /**
- * Puts a file into the store, points a document row at it and renders its pages.
+ * Puts a file into the store, points a document row at it and turns it into pages.
  *
- * A row whose file_name matches is adopted rather than duplicated: the seeded case
- * already describes which documents belong to it, and importing the originals fills in
- * the bytes the description was written about.
+ * A row whose file_name matches is adopted rather than duplicated, so re-sending a file
+ * a case already knows about fills in its bytes instead of listing it twice.
  */
 export const ingestDocument = async (caseId: string, fileName: string, bytes: Uint8Array): Promise<IngestResult> => {
   const stored = await storeDocument(caseId, fileName, bytes);
   const pages = await renderDocumentPages(caseId, stored.documentId);
+  // Rendering first, then the phase: a file that turned out to be unreadable has not
+  // arrived as far as the loop is concerned, and must not offer a run that would skip it.
+  await noteIntake(caseId);
   return { ...stored, pageCount: pages?.pageCount ?? 0 };
 };
 
@@ -104,7 +94,7 @@ const storeDocument = async (caseId: string, fileName: string, bytes: Uint8Array
     relative,
     hash,
     "noch nicht ausgewertet",
-    describe(fileName).kind,
+    fileType(fileName).kind,
     fileName,
     await receivingRun(caseId),
   );
@@ -135,7 +125,7 @@ export const readDocumentFile = async (caseId: string, documentKey: string): Pro
   return {
     absolutePath,
     size: (await stat(absolutePath)).size,
-    contentType: describe(fileName).contentType,
+    contentType: fileType(fileName).contentType,
     fileName,
   };
 };

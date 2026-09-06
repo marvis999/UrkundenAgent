@@ -1,4 +1,5 @@
-// Empties the database so the next start seeds a fresh sample case.
+// Leert die Datenbank. Die App legt das Schema beim nächsten Zugriff neu an; Vorgänge
+// entstehen danach in der App, nicht hier.
 //
 //   npm run db:reset            behält die eingespielten Unterlagen
 //   npm run db:reset -- --files löscht sie mit
@@ -42,4 +43,4 @@ if (process.argv.includes("--files")) {
   console.log(`entfernt  ${documents}`);
 }
 
-console.log("Der nächste Aufruf der App legt den Beispielvorgang neu an.");
+console.log("Der nächste Aufruf der App legt das Schema neu an. Vorgangsliste: leer.");

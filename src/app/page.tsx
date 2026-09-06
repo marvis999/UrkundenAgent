@@ -31,14 +31,20 @@ export default async function CaseListPage() {
         <PageTitle
           summary={caseListSummary(cases)}
           actions={
-            <Button variant="secondary" icon="plus" href={routes.newCase()}>
+            <Button variant={cases.length === 0 ? "accent" : "secondary"} icon="plus" href={routes.newCase()}>
               Neuer Vorgang
             </Button>
           }
         >
           Vorgänge
         </PageTitle>
-        <Table columns={caseColumns} rows={cases} rowKey={(c) => c.id} rowHref={(c) => routes.case(c.id)} />
+        <Table
+          columns={caseColumns}
+          rows={cases}
+          rowKey={(c) => c.id}
+          rowHref={(c) => routes.case(c.id)}
+          emptyText="Noch kein Vorgang. Neuer Vorgang legt einen an: ein Name genügt, alles Weitere kommt aus den Unterlagen."
+        />
       </Page>
     </>
   );

@@ -1,6 +1,6 @@
 import type { IconName } from "@/components/ui/icons";
 import { routes } from "@/lib/routes";
-import { formatPositions, formatRun } from "@/lib/format";
+import { formatPositions, formatRun, plural } from "@/lib/format";
 import type { Candidate, CandidateTarget, CaseView, Field, FieldId, Finding, ReviewPart } from "./model";
 import { FIELD_STATUS_META, OVERVIEW_GROUPS, type FieldStatus, type OverviewGroupId } from "./status";
 import type { Tone } from "./tone";
@@ -78,8 +78,11 @@ export type ActionEmphasis = "primary" | "strong" | "quiet";
 export interface BannerAction {
   label: string;
   icon: IconName;
-  href: string;
   emphasis: ActionEmphasis;
+  /** Where the button goes. Absent when it carries out a run action instead. */
+  href?: string;
+  /** The run action the button performs. Absent when it merely navigates. */
+  run?: "start" | "cancel";
 }
 
 export interface Banner {
@@ -101,9 +104,9 @@ export const deriveBanner = (view: CaseView): Banner => {
     return {
       tone: "neutral",
       icon: "refresh-cw",
-      title: `${formatRun(c.currentRun + 1)} läuft`,
+      title: `${formatRun(c.nextRun)} läuft`,
       text: "Die Felder unten werden aktualisiert, sobald ein Wert gefunden ist.",
-      action: { label: "Abbrechen", icon: "x", href: routes.case(c.id), emphasis: "quiet" },
+      action: { label: "Abbrechen", icon: "x", run: "cancel", emphasis: "quiet" },
     };
   }
   if (c.phase === "waiting") {
@@ -120,9 +123,26 @@ export const deriveBanner = (view: CaseView): Banner => {
     return {
       tone: "confirmed",
       icon: "inbox",
-      title: `${newDocuments.length} neue Unterlagen eingegangen`,
-      text: newDocuments.map((d) => d.type).join(", "),
-      action: { label: `${formatRun(c.currentRun + 1)} starten`, icon: "refresh-cw", href: routes.caseDocuments(c.id), emphasis: "primary" },
+      title: `${plural(newDocuments.length, "neue Unterlage", "neue Unterlagen")} eingegangen`,
+      // File names, not document types: what a document is gets decided by the run that
+      // is about to read it, so before then the name is all there honestly is.
+      text: newDocuments.map((d) => d.fileName).join(", "),
+      action: { label: `${formatRun(c.nextRun)} starten`, icon: "refresh-cw", run: "start", emphasis: "primary" },
+    };
+  }
+  /*
+   * A case with nothing in it. Without this the banner counts ten fields with a Befund and
+   * offers to open the first one -- true, but useless: every one of them says "fehlt"
+   * because nothing has been read yet, and the work is to put something in, not to read
+   * the same sentence ten times.
+   */
+  if (documents.length === 0) {
+    return {
+      tone: "neutral",
+      icon: "inbox",
+      title: "Noch keine Unterlagen",
+      text: "Der Vorgang hat die zehn Felder der Urkunde und nichts, woraus sie zu füllen wären. Dateien ablegen oder Text einfügen, dann liest sie der erste Durchlauf.",
+      action: { label: "Unterlagen öffnen", icon: "arrow-right", href: routes.caseDocuments(c.id), emphasis: "primary" },
     };
   }
   if (basket.length > 0) {
