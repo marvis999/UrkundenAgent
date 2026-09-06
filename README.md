@@ -13,7 +13,8 @@ docker compose up
 
 ## env konfigurieren
 
-1. OpenRouter API-Key einfügen. Der Key kann unter [https://openrouter.ai/workspaces/default/keys](openrouter.ai/workspaces/default/keys) erstellt werden.
-2. Ein multimodales Modell, das Bilder auslesen kann, auswählen. Modelle sind unter [https://openrouter.ai/models](openrouter.ai/models) gelistet. Standardmäßig ist Claude Sonnet 5 eingestellt.
+1. OpenRouter API-Key einfügen. Der Key kann unter [openrouter.ai/workspaces/default/keys](https://openrouter.ai/workspaces/default/keys) erstellt werden.
+2. In den Einstellungen von OpenRouter Training deaktivieren: [openrouter.ai/settings/privacy](https://openrouter.ai/settings/privacy) und Modelle mit Zero Data Retention wählen.
+3. Ein multimodales Modell, das Bilder auslesen kann, auswählen. Modelle sind unter [openrouter.ai/models](https://openrouter.ai/models) gelistet. Standardmäßig ist Claude Sonnet 5 eingestellt.
 
-Danach [http://localhost:3000](http://localhost:3000) öffnen.
+[http://localhost:3000](http://localhost:3000) öffnen.
