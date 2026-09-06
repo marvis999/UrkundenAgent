@@ -227,8 +227,16 @@ const openDraft = async (client: PoolClient, caseId: string, run: number): Promi
 /** `shouldBeInBasket` is the state after the click, not the state before it. */
 export const setBasketItem = (caseId: string, fieldKey: FieldId, shouldBeInBasket: boolean) =>
   mutate(caseId, async (client, run) => {
-    const field = await one(client, "SELECT id FROM field WHERE case_id = $1 AND key = $2", [caseId, fieldKey]);
-    const template = fieldDefinition(fieldKey)?.request;
+    const field = await one(client, "SELECT id, request_title, request_text FROM field WHERE case_id = $1 AND key = $2", [
+      caseId,
+      fieldKey,
+    ]);
+    // The run's own wording wins over the catalog template, so the position in the basket
+    // reads the same as the finding it came from. See `requestOf` in repository.ts.
+    const written = field === undefined ? null : textOrNull(field.request_title);
+    const writtenText = field === undefined ? null : textOrNull(field.request_text);
+    const template =
+      written !== null && writtenText !== null ? { title: written, text: writtenText } : fieldDefinition(fieldKey)?.request;
     if (!field || !template) return;
 
     const requestId = await openDraft(client, caseId, run);

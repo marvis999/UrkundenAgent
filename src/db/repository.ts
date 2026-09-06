@@ -19,6 +19,7 @@ import type {
   Reading,
   Rect,
   RequestItem,
+  RequestTemplate,
   Run,
   Subfield,
 } from "@/domain/model";
@@ -351,6 +352,18 @@ const buildTable = (fieldRowId: string, fieldKey: FieldId, context: CaseContext)
   };
 };
 
+/**
+ * What to request for this field. A run writes the wording for the case at hand -- naming
+ * the document and the date it stumbled over -- and the catalog template stands in until
+ * one has. Both halves must be present before the stored text wins, so a half-written row
+ * cannot leave the basket with a title and no text.
+ */
+const requestOf = (row: Row, fallback: RequestTemplate | undefined): RequestTemplate | undefined => {
+  const title = textOrNull(row.request_title);
+  const text = textOrNull(row.request_text);
+  return title !== null && text !== null ? { title, text } : fallback;
+};
+
 const buildField = (row: Row, context: CaseContext): Field | undefined => {
   const id = text(row.id);
   const key = text(row.key) as FieldId;
@@ -370,7 +383,7 @@ const buildField = (row: Row, context: CaseContext): Field | undefined => {
     subfields,
     ...(table === undefined ? {} : { table }),
     candidates: [...candidates, ...rowCandidates],
-    ...present("request", definition.request),
+    ...present("request", requestOf(row, definition.request)),
     ...present("noRequestReason", textOrNull(row.no_request_reason)),
     ...present("requestedAt", context.requestedAt.get(key)),
     ...(touchedByLaterRun ? { isNew: true } : {}),

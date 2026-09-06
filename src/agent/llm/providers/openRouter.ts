@@ -216,8 +216,25 @@ export const createOpenRouterProvider = (options: OpenRouterProviderOptions = {}
       }
 
       const message = choice["message"] as Record<string, unknown> | undefined;
-      const text = readText(message?.["content"]);
-      if (text.trim() === "") throw new LlmTransportError("OpenRouter returned an empty answer.", undefined, false);
+      /*
+       * A reasoning model sometimes finishes cleanly with an empty `content` and its whole
+       * answer in the reasoning channel. Falling back to it costs nothing -- extractJson
+       * digs the JSON out of surrounding prose either way, and the schema still has to
+       * accept the result -- and the alternative is losing a field to a provider quirk.
+       */
+      const content = readText(message?.["content"]);
+      const text =
+        content.trim() === "" ? readText(message?.["reasoning"] ?? message?.["reasoning_content"]) : content;
+      // A reasoning model that spends its whole budget thinking answers with empty content
+      // and no length signal. That is worth another attempt: losing the call loses a field.
+      if (text.trim() === "") {
+        lastError = new LlmTransportError(
+          `OpenRouter returned an empty answer (finish_reason: ${String(choice["finish_reason"] ?? "none")}).`,
+          undefined,
+          true,
+        );
+        continue;
+      }
 
       return {
         text,

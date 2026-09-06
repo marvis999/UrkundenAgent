@@ -63,6 +63,20 @@ CREATE TABLE IF NOT EXISTS document (
   UNIQUE (case_id, hash)
 );
 
+-- One row per rendered page. The image lives next to the original in the data
+-- directory; the text layer is stored so a run can tell a text page from a scan
+-- before deciding whether to send the image to the model.
+CREATE TABLE IF NOT EXISTS page (
+  id          text PRIMARY KEY,
+  document_id text NOT NULL REFERENCES document(id) ON DELETE CASCADE,
+  number      integer NOT NULL,
+  image_path  text NOT NULL,
+  width       integer NOT NULL,
+  height      integer NOT NULL,
+  text        text NOT NULL DEFAULT '',
+  UNIQUE (document_id, number)
+);
+
 CREATE TABLE IF NOT EXISTS field (
   id         text PRIMARY KEY,
   case_id    text NOT NULL REFERENCES case_file(id) ON DELETE CASCADE,
@@ -73,8 +87,18 @@ CREATE TABLE IF NOT EXISTS field (
   kind       text NOT NULL CHECK (kind IN ('values', 'table')),
   -- Set when a request would be wrong, e.g. deliberately redacted data.
   no_request_reason text,
+  -- What a run concluded should be requested for this field. NULL falls back to the
+  -- catalog template: the catalog states the general case, a run states this one.
+  request_title text,
+  request_text  text,
   UNIQUE (case_id, key)
 );
+
+-- The two request columns arrived after the table did, and CREATE TABLE IF NOT EXISTS
+-- does not add a column to a table that already exists. Stated as an idempotent ALTER so
+-- a database from before they existed picks them up on the next start, without a reset.
+ALTER TABLE field ADD COLUMN IF NOT EXISTS request_title text;
+ALTER TABLE field ADD COLUMN IF NOT EXISTS request_text  text;
 
 CREATE TABLE IF NOT EXISTS subfield (
   id         text PRIMARY KEY,
@@ -244,6 +268,7 @@ CREATE INDEX IF NOT EXISTS candidate_by_row      ON candidate (table_row_id);
 CREATE INDEX IF NOT EXISTS history_by_field      ON history (field_id, run);
 CREATE INDEX IF NOT EXISTS finding_by_field      ON finding (field_id);
 CREATE INDEX IF NOT EXISTS document_by_case      ON document (case_id);
+CREATE INDEX IF NOT EXISTS page_by_document      ON page (document_id, number);
 CREATE INDEX IF NOT EXISTS field_by_case         ON field (case_id, sort_order);
 CREATE INDEX IF NOT EXISTS subfield_by_field     ON subfield (field_id, sort_order);
 CREATE INDEX IF NOT EXISTS table_row_by_field    ON table_row (field_id, sort_order);

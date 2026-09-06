@@ -10,10 +10,11 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/agent/llm/llm.test.ts",
+    "test": "node --import tsx --test src/agent/llm/llm.test.ts src/agent/agent.test.ts",
     "import": "node --env-file-if-exists=.env scripts/import-documents.mjs",
     "db:reset": "node --env-file-if-exists=.env scripts/reset-database.mjs",
-    "llm:smoke": "tsx scripts/llm-smoke.ts"
+    "llm:smoke": "tsx scripts/llm-smoke.ts",
+    "agent": "tsx scripts/run-agent.ts"
   },
   "dependencies": {
     "next": "^15.5.25",
