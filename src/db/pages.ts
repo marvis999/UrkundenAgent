@@ -35,8 +35,6 @@ const findDocument = (caseId: string, documentKey: string) =>
 export interface QuoteReport {
   /** Quotes that were found exactly once, and so carry a marked region. */
   quotesLocated: number;
-  /** Not on the page they name. A value whose quote is nowhere in the document it cites. */
-  quotesMissing: number;
   /**
    * On the page more than once, so the quote does not say which occurrence was read.
    * Marking the first would be a guess drawn as evidence -- the clerk would check a
@@ -53,7 +51,7 @@ export interface RenderResult extends QuoteReport {
   pagesWithText: number;
 }
 
-const NO_QUOTES: QuoteReport = { quotesLocated: 0, quotesMissing: 0, quotesAmbiguous: 0 };
+const NO_QUOTES: QuoteReport = { quotesLocated: 0, quotesAmbiguous: 0 };
 
 interface PageRow {
   number: number;
@@ -165,14 +163,10 @@ export const locateDocumentQuotes = async (caseId: string, documentKey: string):
   );
 
   let quotesLocated = 0;
-  let quotesMissing = 0;
   let quotesAmbiguous = 0;
   for (const [index, candidate] of candidates.entries()) {
     const hit = located[index];
-    if (hit === undefined) {
-      quotesMissing += 1;
-      continue;
-    }
+    if (hit === undefined) continue;
     if (hit.hits > 1) {
       quotesAmbiguous += 1;
       continue;
@@ -189,7 +183,7 @@ export const locateDocumentQuotes = async (caseId: string, documentKey: string):
     }), text(candidate.id));
     quotesLocated += 1;
   }
-  return { quotesLocated, quotesMissing, quotesAmbiguous };
+  return { quotesLocated, quotesAmbiguous };
 };
 
 export interface PageImage {

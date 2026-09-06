@@ -32,21 +32,11 @@ const STAGE_META: Record<Stage, { tone: Tone; icon: IconName }> = {
   failed: { tone: "missing", icon: "triangle-alert" },
 };
 
-interface ImportedFile {
-  attachedToExisting?: boolean;
-  pageCount?: number;
+/** The shape of our own import endpoint's answer; one file in, one entry back. */
+interface ImportResponse {
+  error?: string;
+  imported?: { attachedToExisting?: boolean; pageCount?: number }[];
 }
-
-/** What came back, without trusting the shape of a JSON body. */
-const readBody = (payload: unknown): { error?: string; imported?: ImportedFile } => {
-  if (typeof payload !== "object" || payload === null) return {};
-  const body = payload as { error?: unknown; imported?: unknown };
-  const first = Array.isArray(body.imported) ? (body.imported[0] as ImportedFile | undefined) : undefined;
-  return {
-    ...(typeof body.error === "string" ? { error: body.error } : {}),
-    ...(first === undefined ? {} : { imported: first }),
-  };
-};
 
 /**
  * The drop zone of the Unterlagen tab.
@@ -71,9 +61,10 @@ export function UploadZone({ caseId, note }: UploadZoneProps) {
       const body = new FormData();
       body.append("file", file);
       const response = await fetch(`/api/cases/${caseId}/documents`, { method: "POST", body });
-      const { error, imported } = readBody(await response.json());
+      const answer = (await response.json()) as ImportResponse;
+      const imported = answer.imported?.[0];
       if (!response.ok || imported === undefined) {
-        return { fileName: file.name, stage: "failed", note: error ?? `Antwort ${response.status}` };
+        return { fileName: file.name, stage: "failed", note: answer.error ?? `Antwort ${response.status}` };
       }
       const pages = imported.pageCount ?? 0;
       const rendered = pages === 0 ? "kein lesbares Format, keine Seiten" : `${plural(pages, "Seite", "Seiten")} gerendert`;

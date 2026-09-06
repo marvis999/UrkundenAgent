@@ -16,8 +16,6 @@ import { int, query, transaction, type Row } from "./connect";
  */
 
 const SEQUENCE_DIGITS = 4;
-/** Ids are unique, so a lost race is a retry, not an error. */
-const ATTEMPTS = 5;
 
 export interface NewCase {
   readonly name: string;
@@ -78,17 +76,10 @@ const writeCase = async (caseId: string, fileNumber: string, name: string) =>
  */
 export const createCase = async (input: NewCase): Promise<string> => {
   const year = todayIso().slice(0, 4);
-  for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
-    const sequence = (await nextSequence(year)) + attempt;
-    const caseId = `${year}-${String(sequence).padStart(SEQUENCE_DIGITS, "0")}`;
-    try {
-      await writeCase(caseId, `UR II ${sequence}/${year}`, input.name);
-      return caseId;
-    } catch (error) {
-      // Another case took the number between the read and the write; take the next one.
-      const isDuplicate = error instanceof Error && "code" in error && error.code === "23505";
-      if (!isDuplicate || attempt === ATTEMPTS - 1) throw error;
-    }
-  }
-  throw new Error("Vorgangsnummer konnte nicht vergeben werden.");
+  const sequence = await nextSequence(year);
+  const caseId = `${year}-${String(sequence).padStart(SEQUENCE_DIGITS, "0")}`;
+  // Two cases opened in the same second would collide on the primary key and the second
+  // one would fail loudly. One office, one clerk: not worth a retry that never runs.
+  await writeCase(caseId, `UR II ${sequence}/${year}`, input.name);
+  return caseId;
 };

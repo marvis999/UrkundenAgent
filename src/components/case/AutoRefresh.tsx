@@ -3,12 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-interface AutoRefreshProps {
-  /** Milliseconds between refreshes. */
-  everyMs?: number;
-}
-
-const DEFAULT_INTERVAL = 2000;
+const INTERVAL_MS = 2000;
 
 /**
  * Re-fetches the server-rendered page while a run is in flight.
@@ -18,13 +13,13 @@ const DEFAULT_INTERVAL = 2000;
  * scroll position and any open field, which a reload would lose. Mounted only during the
  * analysis phase, so a case at rest makes no requests.
  */
-export function AutoRefresh({ everyMs = DEFAULT_INTERVAL }: AutoRefreshProps) {
+export function AutoRefresh() {
   const router = useRouter();
 
   useEffect(() => {
-    const timer = setInterval(() => router.refresh(), everyMs);
+    const timer = setInterval(() => router.refresh(), INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [router, everyMs]);
+  }, [router]);
 
   return null;
 }

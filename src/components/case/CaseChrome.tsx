@@ -31,7 +31,7 @@ const ACTION_VARIANT: Record<ActionEmphasis, ButtonVariant> = {
  */
 const renderAction = (caseId: string, action: BannerAction, iconSide: "start" | "end") => {
   const variant = ACTION_VARIANT[action.emphasis];
-  if (action.run === "start") return <StartRun caseId={caseId} label={action.label} variant={variant} />;
+  if (action.run === "start") return <StartRun caseId={caseId} label={action.label} />;
   if (action.run === "cancel") {
     return (
       <ActionForm action={cancelRunAction} values={{ case: caseId }}>

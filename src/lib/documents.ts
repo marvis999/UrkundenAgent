@@ -14,7 +14,7 @@ import type { DocumentKind } from "@/domain/status";
  * form is settled once, here.
  */
 
-export type DocumentForm = "rendered" | "text";
+type DocumentForm = "rendered" | "text";
 
 export interface FileType {
   readonly kind: DocumentKind;
@@ -35,7 +35,6 @@ const BY_EXTENSION: Readonly<Record<string, FileType>> = {
    */
   ".eml": { kind: "email", contentType: "message/rfc822; charset=utf-8", form: "text" },
   ".txt": { kind: "note", contentType: "text/plain; charset=utf-8", form: "text" },
-  ".md": { kind: "note", contentType: "text/plain; charset=utf-8", form: "text" },
 };
 
 /** An unknown extension is treated as a scan: it may still be a PDF under another name. */
@@ -56,7 +55,7 @@ export const ACCEPTED_EXTENSIONS = Object.keys(BY_EXTENSION).join(",");
 const NOTE_EXTENSION = ".txt";
 
 /** Default name for text pasted where no name was asked for. */
-export const NOTE_FALLBACK_NAME = "Notiz";
+const NOTE_FALLBACK_NAME = "Notiz";
 
 /**
  * File name for a note somebody typed.
