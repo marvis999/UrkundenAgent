@@ -4,9 +4,17 @@
   border-radius: var(--radius);
   background: var(--color-paper-photo);
 }
+/*
+ * A ratio rather than a height: the component works out which part of the page to show
+ * from the shape of this box, so the shape has to be a constant it can know. The height
+ * still has a floor, for a card in a very narrow column.
+ */
 .inline {
   width: 100%;
-  height: var(--image-excerpt-height);
+  /* Set per excerpt from the shape of the marked region; the fallback is for a card whose
+     document has not been imported and so has no region to shape it. */
+  aspect-ratio: var(--excerpt-ratio, 2.2);
+  min-height: var(--image-excerpt-height);
 }
 .page {
   width: min(100%, var(--viewer-page-width));
@@ -47,12 +55,17 @@
   width: 100%;
   height: auto;
 }
+/*
+ * The whole page, scaled up so the view box fills the frame, then slid so the view box's
+ * top left corner sits in the frame's top left corner. Percentages in the translate are
+ * of this layer, and the layer is exactly the page -- so `--view-x` and `--view-y` are
+ * read as percentages of the page, which is the space the component computed them in.
+ */
 .zoom {
   position: absolute;
-  top: 50%;
+  top: 0;
   left: 0;
   width: calc(100% * var(--zoom));
-  /* Percentages here are of this layer, so the marked region lands at the left edge and centre. */
   transform: translate(calc(var(--view-x) * -1%), calc(var(--view-y) * -1%));
 }
 

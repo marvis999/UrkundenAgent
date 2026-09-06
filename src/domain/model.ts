@@ -55,6 +55,8 @@ export interface ImageEvidence {
   crop: Rect;
   caption: string;
   hint: string;
+  /** Height of the cited page divided by its width. Absent while the page is unrendered. */
+  pageAspect?: number;
   question?: string;
   readings?: Reading[];
 }

@@ -60,7 +60,10 @@ const imageOf = (row: Row): ImageEvidence | undefined => {
   const stored = json<StoredCrop>(row.crop);
   if (!stored) return undefined;
   const readings = json<Reading[]>(row.readings);
+  const width = int(row.page_width);
+  const height = int(row.page_height);
   return {
+    ...(width > 0 && height > 0 ? { pageAspect: height / width } : {}),
     // Stored as fractions of the page so the marker survives any render size.
     crop: { x: stored.x * PERCENT, y: stored.y * PERCENT, w: stored.w * PERCENT, h: stored.h * PERCENT },
     caption: stored.caption,
@@ -190,10 +193,14 @@ const loadRows = async (caseId: string | null) => {
         caseId,
       ),
       query(
-        `SELECT c.*, f.case_id FROM candidate c
+        // The page the candidate cites brings its own proportions: the excerpt has to
+        // scale the marked region into a frame, and a landscape photo and an A4 scan need
+        // different amounts of it.
+        `SELECT c.*, f.case_id, pg.width AS page_width, pg.height AS page_height FROM candidate c
          LEFT JOIN subfield s ON s.id = c.subfield_id
          LEFT JOIN table_row t ON t.id = c.table_row_id
          JOIN field f ON f.id = COALESCE(s.field_id, t.field_id)
+         LEFT JOIN page pg ON pg.document_id = c.document_id AND pg.number = c.page
          WHERE ${byField} ORDER BY c.created_at, c.id`,
         caseId,
       ),
