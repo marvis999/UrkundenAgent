@@ -32,7 +32,7 @@ export default async function CaseListPage() {
   const cases = await listCases();
   return (
     <>
-      <TopBar start={<Brand name={workspace.productName} office={workspace.officeName} />} end={<UserChip initials={workspace.userInitials} />} />
+      <TopBar start={<Brand name={workspace.productName} />} end={<UserChip initials={workspace.userInitials} />} />
       <Page>
         <PageTitle
           summary={caseListSummary(cases)}

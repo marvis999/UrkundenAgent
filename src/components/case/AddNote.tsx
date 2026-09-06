@@ -76,7 +76,7 @@ export function AddNote({ caseId }: AddNoteProps) {
               <input type="hidden" name="case" value={caseId} />
               <Stack gap="regular">
                 <FormField label="Name" hint="steht später an jeder Fundstelle aus diesem Text">
-                  <input ref={nameInput} name="name" placeholder="Makler-E-Mail vom 02.09." required />
+                  <input ref={nameInput} name="name" placeholder="Bezeichnung, gern mit Datum" required />
                 </FormField>
                 <FormField label="Text">
                   <textarea name="text" rows={TEXT_ROWS} placeholder="Vollständig einfügen, inklusive Nachträgen." required />

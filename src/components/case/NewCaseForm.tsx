@@ -41,10 +41,10 @@ export function NewCaseForm() {
       <input type="hidden" name="noteName" value={NOTE_NAME} />
       <Stack gap="regular">
         <FormField label="Vorgangsname" hint="Objekt und Beteiligte folgen aus den Unterlagen">
-          <input name="name" placeholder="Mehrfamilienhaus Nordstadt" required />
+          <input name="name" placeholder="Bezeichnung des Vorgangs" required />
         </FormField>
         <FormField label="Notiz oder E-Mail" hint="vollständig einfügen, inklusive Nachträgen">
-          <textarea name="text" rows={TEXT_ROWS} placeholder="E-Mail des Maklers, Telefonnotiz, Nachtrag …" />
+          <textarea name="text" rows={TEXT_ROWS} placeholder="Text, wie er eingegangen ist: E-Mail, Telefonnotiz, Nachtrag …" />
         </FormField>
         <DropZone
           name="files"

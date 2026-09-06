@@ -93,7 +93,7 @@ export function ManualCorrection({ caseId, fieldId, partId, fieldLabel, partLabe
                     rows={REASON_ROWS}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
-                    placeholder="z. B. telefonisch mit dem Makler bestätigt"
+                    placeholder="z. B. telefonisch bestätigt"
                     required
                   />
                 </FormField>

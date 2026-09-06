@@ -9,7 +9,6 @@ import { Table, TRACK, type Column } from "@/components/ui/Table";
 import { Text } from "@/components/ui/Text";
 import { TonedIcon } from "@/components/ui/TonedIcon";
 import { CLAUSES } from "@/catalog/fields";
-import { workspace } from "@/data/workspace";
 import { draftStamp } from "@/domain/derive";
 import { clauseViews, draftGaps, type ClauseView } from "@/domain/draft";
 import type { CaseView } from "@/domain/model";
@@ -46,7 +45,7 @@ export function Draft({ view }: DraftProps) {
           </Stack>
         }
       >
-        <PageTitle summary={`Vorlage: ${workspace.draftTemplate}`}>Kaufvertragsentwurf</PageTitle>
+        <PageTitle summary="welche Felder in welche Klausel gehen">Kaufvertragsentwurf</PageTitle>
         <Table columns={clauseColumns} rows={clauses} rowKey={(c) => c.clause.number} />
       </Columns>
     </Page>

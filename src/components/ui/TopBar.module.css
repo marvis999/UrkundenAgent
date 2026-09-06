@@ -29,9 +29,6 @@
   font-weight: 600;
   font-size: var(--text-md);
 }
-.office {
-  color: var(--color-text-muted);
-}
 
 .user {
   display: flex;
