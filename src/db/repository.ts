@@ -105,7 +105,7 @@ const toCandidate = (row: Row, target: CandidateTarget, chosenId: string | null,
   };
 };
 
-const toDocument = (row: Row, caseId: string, lastFinishedRun: number): Document => {
+const toDocument = (row: Row, caseId: string, lastFinishedRun: number, hasPages: boolean): Document => {
   const caption = textOrNull(row.photo_caption);
   const hint = textOrNull(row.photo_hint);
   return {
@@ -122,6 +122,7 @@ const toDocument = (row: Row, caseId: string, lastFinishedRun: number): Document
     subtitle: text(row.subtitle),
     ...(caption === null || hint === null ? {} : { photoNote: { caption, hint } }),
     ...(int(row.received_in_run) > lastFinishedRun ? { isNew: true } : {}),
+    ...(hasPages ? { hasPages: true } : {}),
   };
 };
 
@@ -174,7 +175,7 @@ const loadRows = async (caseId: string | null) => {
   const byCase = scope("case_id");
   const byField = scope("f.case_id");
 
-  const [cases, runs, documents, fields, subfields, tableRows, candidates, findings, history, requests, requestItems, progress] =
+  const [cases, runs, documents, fields, subfields, tableRows, candidates, findings, history, requests, requestItems, progress, renderedPages] =
     await Promise.all([
       query(`SELECT * FROM case_file WHERE ${scope("id")} ORDER BY changed_at DESC`, caseId),
       query(`SELECT * FROM run WHERE ${byCase} ORDER BY case_id, number`, caseId),
@@ -220,9 +221,14 @@ const loadRows = async (caseId: string | null) => {
          WHERE ${scope("r.case_id")} AND r.finished_at IS NULL`,
         caseId,
       ),
+      query(
+        `SELECT d.case_id, p.document_id, COUNT(*) AS total FROM page p JOIN document d ON d.id = p.document_id
+         WHERE ${scope("d.case_id")} GROUP BY d.case_id, p.document_id`,
+        caseId,
+      ),
     ]);
 
-  return { cases, runs, documents, fields, subfields, tableRows, candidates, findings, history, requests, requestItems, progress };
+  return { cases, runs, documents, fields, subfields, tableRows, candidates, findings, history, requests, requestItems, progress, renderedPages };
 };
 
 type LoadedRows = Awaited<ReturnType<typeof loadRows>>;
@@ -433,7 +439,8 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
   const fields = forCase(rows.fields)
     .map((fieldRow) => buildField(fieldRow, context))
     .filter((field): field is Field => field !== undefined);
-  const documents = documentRows.map((row) => toDocument(row, caseId, lastFinishedRun));
+  const rendered = new Set(forCase(rows.renderedPages).map((row) => text(row.document_id)));
+  const documents = documentRows.map((row) => toDocument(row, caseId, lastFinishedRun, rendered.has(text(row.id))));
 
   // A request sent during run N is reconciled by run N + 1, which reports what it settled.
   const resolvedByRun = groupBy(

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { documentsDirectory, int, query, queryOne, text, textOrNull } from "./connect";
+import { renderDocumentPages } from "./pages";
 
 /**
  * Original documents on disk.
@@ -57,16 +58,24 @@ export interface IngestResult {
   documentId: string;
   /** True when the bytes were already present, or the file matched a document row. */
   attachedToExisting: boolean;
+  /** Pages rendered from the file, 0 for a kind that cannot be rendered. */
+  pageCount: number;
 }
 
 /**
- * Puts a file into the store and points a document row at it.
+ * Puts a file into the store, points a document row at it and renders its pages.
  *
  * A row whose file_name matches is adopted rather than duplicated: the seeded case
  * already describes which documents belong to it, and importing the originals fills in
  * the bytes the description was written about.
  */
 export const ingestDocument = async (caseId: string, fileName: string, bytes: Uint8Array): Promise<IngestResult> => {
+  const stored = await storeDocument(caseId, fileName, bytes);
+  const pages = await renderDocumentPages(caseId, stored.documentId);
+  return { ...stored, pageCount: pages?.pageCount ?? 0 };
+};
+
+const storeDocument = async (caseId: string, fileName: string, bytes: Uint8Array): Promise<Omit<IngestResult, "pageCount">> => {
   const hash = sha256(bytes);
 
   const existingHash = await queryOne("SELECT id FROM document WHERE case_id = $1 AND hash = $2", caseId, hash);

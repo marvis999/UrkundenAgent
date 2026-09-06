@@ -17,6 +17,7 @@
     "agent": "tsx scripts/run-agent.ts"
   },
   "dependencies": {
+    "mupdf": "^1.28.0",
     "next": "^15.5.25",
     "pg": "^8.23.0",
     "react": "19.1.1",

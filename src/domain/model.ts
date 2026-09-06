@@ -167,6 +167,8 @@ export interface Document {
   subtitle: string;
   photoNote?: PhotoNote;
   isNew?: boolean;
+  /** Set once the original has been rendered, so the viewer can show real pages. */
+  hasPages?: boolean;
 }
 
 export interface RequestItem {

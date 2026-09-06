@@ -7,8 +7,10 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Stack } from "@/components/ui/layout";
 import { Text } from "@/components/ui/Text";
 import { candidatesFor, hasFinding } from "@/domain/derive";
+import { documentById } from "@/domain/evidence";
 import type { CandidateTarget, CaseView, EncumbranceRow, Field, ReviewPart } from "@/domain/model";
 import { FIELD_STATUS_META, PROCEDURES, PROCEDURE_META } from "@/domain/status";
+import { routes } from "@/lib/routes";
 import { CandidateCard } from "./CandidateCard";
 import { HistoryList } from "./HistoryList";
 import { ManualCorrection } from "./ManualCorrection";
@@ -42,6 +44,11 @@ export function PartDetail({ view, field, part, label, target, noEvidenceText, c
   const canRequest = field.request !== undefined && part.status !== "redacted" && !requestIsOut;
   // A table row has no single value to correct; its cells get candidates of their own later.
   const canCorrect = target.kind === "subfield";
+  /** The page a candidate cites, but only once that document has been rendered. */
+  const pageSrcOf = (documentId?: string, page?: number) => {
+    if (documentId === undefined || page === undefined) return undefined;
+    return documentById(view, documentId)?.hasPages === true ? routes.pageImage(view.case.id, documentId, page) : undefined;
+  };
 
   return (
     <Stack gap="regular">
@@ -61,6 +68,7 @@ export function PartDetail({ view, field, part, label, target, noEvidenceText, c
                 partId={part.id}
                 candidate={candidate}
                 confirmed={part.status === "confirmed"}
+                pageSrc={pageSrcOf(candidate.documentId, candidate.page)}
               />
             ))}
           </Stack>

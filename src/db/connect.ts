@@ -16,8 +16,20 @@ import { seedIfEmpty } from "./seed";
 const SCHEMA_FILE = path.join("src", "db", "schema.sql");
 const DOCUMENTS_DIRECTORY = "dokumente";
 
-/** Original documents live here. The database holds the paths, never the bytes. */
-export const dataDirectory = () => process.env.URKUNDEN_DATA_DIR ?? path.join(process.cwd(), "data");
+/**
+ * Original documents live here. The database holds the paths, never the bytes.
+ *
+ * Named by the environment and never derived from the working directory. A path the
+ * build can work out is a path the build copies: with a default of `cwd/data` the file
+ * tracer put every confidential original into the standalone output.
+ */
+export const dataDirectory = () => {
+  const directory = process.env.URKUNDEN_DATA_DIR;
+  if (!directory) {
+    throw new Error("URKUNDEN_DATA_DIR ist nicht gesetzt. .env.example nach .env kopieren.");
+  }
+  return directory;
+};
 
 export const documentsDirectory = () => path.join(dataDirectory(), DOCUMENTS_DIRECTORY);
 

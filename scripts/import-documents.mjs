@@ -37,7 +37,7 @@ if (!response.ok) {
 
 const { imported } = await response.json();
 for (const item of imported) {
-  console.log(`${item.attachedToExisting ? "zugeordnet" : "neu angelegt"}  ${item.fileName}`);
+  console.log(`${item.attachedToExisting ? "zugeordnet" : "neu angelegt"}  ${item.fileName}  (${item.pageCount} Seiten gerendert)`);
 }
 
 const { documents } = await fetch(endpoint).then((r) => r.json());

@@ -45,6 +45,8 @@ export const routes = {
   caseDocuments: (caseId: string) => `/cases/${caseId}/documents`,
   document: (caseId: string, documentId: string, page?: number) =>
     withQuery(`/cases/${caseId}/documents/${documentId}`, { [QUERY.page]: page }),
+  /** The rendered page image, served through the case. */
+  pageImage: (caseId: string, documentId: string, page: number) => `/api/cases/${caseId}/documents/${documentId}/pages/${page}`,
   caseDraft: (caseId: string) => `/cases/${caseId}/draft`,
   caseRequest: (caseId: string) => `/cases/${caseId}/request`,
 };

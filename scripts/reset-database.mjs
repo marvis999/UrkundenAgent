@@ -32,7 +32,12 @@ await client.end();
 console.log("Datenbank geleert.");
 
 if (process.argv.includes("--files")) {
-  const documents = path.join(process.env.URKUNDEN_DATA_DIR ?? path.join(process.cwd(), "data"), "dokumente");
+  const dataDirectory = process.env.URKUNDEN_DATA_DIR;
+  if (!dataDirectory) {
+    console.error("URKUNDEN_DATA_DIR ist nicht gesetzt, die Unterlagen bleiben liegen.");
+    process.exit(1);
+  }
+  const documents = path.join(dataDirectory, "dokumente");
   await rm(documents, { recursive: true, force: true });
   console.log(`entfernt  ${documents}`);
 }

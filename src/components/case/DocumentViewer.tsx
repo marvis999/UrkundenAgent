@@ -26,6 +26,8 @@ export function DocumentViewer({ view, document, page: requestedPage }: Document
   const located = candidateOnPage(view, document.id, page);
   const isPhoto = document.kind === "photo";
   const pageHref = (n: number) => routes.document(caseId, document.id, clampPage(n, document.pageCount));
+  // Once the original is rendered, every kind shows its real page; the faux sheet is for descriptions only.
+  const pageSrc = document.hasPages ? routes.pageImage(caseId, document.id, page) : undefined;
 
   const thumbnails: PageIndicator[] = Array.from({ length: document.pageCount }, (_, i) => {
     const number = i + 1;
@@ -70,9 +72,9 @@ export function DocumentViewer({ view, document, page: requestedPage }: Document
           <PageIndicators pages={thumbnails} variant="thumbnails" paper={isPhoto ? "photo" : "text"} />
         </div>
         <div className={styles.stage}>
-          {isPhoto ? (
+          {isPhoto || pageSrc ? (
             <div className={styles.photo}>
-              <ImageFrame crop={located?.candidate.image?.crop} caption={document.photoNote?.caption ?? document.type} size="page" />
+              <ImageFrame src={pageSrc} crop={located?.candidate.image?.crop} caption={document.photoNote?.caption ?? document.type} size="page" />
               {document.photoNote && <Notice tone="neutral" icon="scan-text" text={document.photoNote.hint} size="compact" surface="white" />}
             </div>
           ) : (

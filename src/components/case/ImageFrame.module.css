@@ -31,6 +31,42 @@
   opacity: 0.35;
 }
 
+/* The layer the image and its marker share, so both zoom together. */
+.flat {
+  position: absolute;
+  inset: 0;
+}
+/* The frame takes the image's proportions instead of imposing the paper ratio. */
+.sized {
+  aspect-ratio: auto;
+}
+.natural {
+  position: relative;
+}
+.natural .image {
+  width: 100%;
+  height: auto;
+}
+.zoom {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: calc(100% * var(--zoom));
+  /* Percentages here are of this layer, so the marked region lands at the left edge and centre. */
+  transform: translate(calc(var(--view-x) * -1%), calc(var(--view-y) * -1%));
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--color-surface);
+}
+.zoom .image {
+  height: auto;
+}
+
 .marker {
   position: absolute;
   left: var(--crop-x);
