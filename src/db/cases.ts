@@ -26,17 +26,19 @@ const nextSequence = async (year: string): Promise<number> => {
   return (numbers.length === 0 ? 0 : Math.max(...numbers)) + 1;
 };
 
-const writeCase = async (caseId: string, fileNumber: string, name: string) =>
+/**
+ * Writes every field and subfield of the catalog the case does not have yet, empty.
+ *
+ * Idempotent, so it serves a new case and an old one alike: a run calls it first, and a
+ * subfield added to the catalog after the case was opened is there to be read.
+ */
+export const ensureCatalog = (caseId: string) =>
   transaction(async (client) => {
-    await client.query(
-      "INSERT INTO case_file (id, name, file_number, property, phase, current_run, changed_at) VALUES ($1, $2, $3, '', 'review', 0, $4)",
-      [caseId, name, fileNumber, nowIso()],
-    );
-
     for (const [fieldIndex, definition] of FIELD_CATALOG.entries()) {
       const fieldId = `${caseId}:${definition.key}`;
       await client.query(
-        "INSERT INTO field (id, case_id, key, label, group_key, sort_order, kind) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        `INSERT INTO field (id, case_id, key, label, group_key, sort_order, kind) VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO NOTHING`,
         [fieldId, caseId, definition.key, definition.label, definition.groupKey, fieldIndex, definition.kind],
       );
 
@@ -45,7 +47,8 @@ const writeCase = async (caseId: string, fileNumber: string, name: string) =>
         await client.query(
           `INSERT INTO subfield (id, field_id, key, label, sort_order, value_type,
                                  stale_after_days, stale_when_value_in_past, confidence_threshold, absence_note)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           ON CONFLICT (id) DO NOTHING`,
           [
             `${fieldId}.${subfield.key}`,
             fieldId,
@@ -77,6 +80,13 @@ export const createCase = async (input: NewCase): Promise<string> => {
   const caseId = `${year}-${String(sequence).padStart(SEQUENCE_DIGITS, "0")}`;
   // Two cases opened in the same second would collide on the primary key and the second
   // one would fail loudly. One office, one clerk: not worth a retry that never runs.
-  await writeCase(caseId, `UR II ${sequence}/${year}`, input.name);
+  await query(
+    "INSERT INTO case_file (id, name, file_number, property, phase, current_run, changed_at) VALUES ($1, $2, $3, '', 'review', 0, $4)",
+    caseId,
+    input.name,
+    `UR II ${sequence}/${year}`,
+    nowIso(),
+  );
+  await ensureCatalog(caseId);
   return caseId;
 };

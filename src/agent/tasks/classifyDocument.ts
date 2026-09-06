@@ -3,7 +3,7 @@ import { completeJson, type LlmProvider, type PromptPart } from "@/agent/llm";
 import type { PlannedDocument } from "@/agent/plan";
 import { FIELD_CATALOG } from "@/catalog/fields";
 import { FIELD_IDS, type FieldId } from "@/domain/model";
-import { DOCUMENT_STATUSES, SOURCE_CLASSES, type DocumentStatus, type SourceClass } from "@/domain/status";
+import { DOC_TYPES, DOCUMENT_STATUSES, SOURCE_CLASSES, type DocType, type DocumentStatus, type SourceClass } from "@/domain/status";
 import { documentHeader, pageParts } from "./parts";
 
 /**
@@ -11,10 +11,11 @@ import { documentHeader, pageParts } from "./parts";
  *
  * Two jobs in one call, because both need the same glance over the whole file.
  *
- * The first job fills the columns the Unterlagen tab shows and that nothing else can
- * produce: the German quality line, the issue date, the source class. `doc_date` is the
- * one that matters beyond display -- without it staleness rule 5a cannot fire at all,
- * and the Grundbuchauszug from 2011 would pass for current.
+ * The first job fills the columns the Unterlagen tab shows: the type from a fixed list,
+ * the issue date, the source class, the state of the file. Every one is a choice or a
+ * date, never a sentence. `doc_date` is the one that matters beyond display -- without it
+ * staleness rule 5a cannot fire at all, and the Grundbuchauszug from 2011 would pass for
+ * current.
  *
  * The second job is the page routing. A Grundbuchauszug is Aufschrift, Bestands-
  * verzeichnis, Abteilung I, II and III, and that structure maps almost one to one onto
@@ -25,46 +26,38 @@ import { documentHeader, pageParts } from "./parts";
  * the worst case is that extraction looks at a page that turns out to hold nothing.
  */
 
-export const CLASSIFY_PROMPT_VERSION = "2026-09-07";
+export const CLASSIFY_PROMPT_VERSION = "2026-09-08";
 
 const PageRoleSchema = z.object({
   number: z.number().int().positive(),
   /** Short German name for the section, e.g. "Bestandsverzeichnis", "Abteilung III". */
   role: z.string(),
+  /** Degrees clockwise the image must be turned to read upright: 0, 90, 180 or 270. */
+  rotation: z.number().int(),
   /** Fields this page could contribute to. Empty is a valid and useful answer. */
   fieldKeys: z.array(z.enum(FIELD_IDS)),
 });
 
+/** The turns a page can need. Anything else the model says is read as "upright". */
+const TURNS = [0, 90, 180, 270];
+
 export const ClassificationSchema = z.object({
-  docType: z.string(),
+  /** From the fixed list. A model picks a name here; it does not write one. */
+  docType: z.enum(DOC_TYPES),
   /** ISO date the document was issued, or null when it carries none. Never guessed. */
   docDate: z.string().nullable(),
   sourceClass: z.enum(SOURCE_CLASSES),
   status: z.enum(DOCUMENT_STATUSES),
-  quality: z.string(),
-  title: z.string(),
-  subtitle: z.string(),
-  /** Only for photographed pages; null for a clean scan or a text PDF. */
-  photoCaption: z.string().nullable(),
-  photoHint: z.string().nullable(),
-  /** The address of the property, when the document names one. Not a value of the deed. */
-  propertyAddress: z.string().nullable(),
   pages: z.array(PageRoleSchema),
 });
 
 export type Classification = z.infer<typeof ClassificationSchema>;
 
 export interface DocumentFacts {
-  readonly docType: string;
+  readonly docType: DocType;
   readonly docDate: string | null;
   readonly sourceClass: SourceClass;
   readonly status: DocumentStatus;
-  readonly quality: string;
-  readonly title: string;
-  readonly subtitle: string;
-  readonly photoCaption: string | null;
-  readonly photoHint: string | null;
-  readonly propertyAddress: string | null;
 }
 
 /** Which fields each page can contribute to, by page number. */
@@ -73,10 +66,15 @@ export type PageRouting = ReadonlyMap<number, readonly FieldId[]>;
 export interface ClassifyResult {
   readonly facts: DocumentFacts;
   readonly routing: PageRouting;
+  /** Degrees clockwise each page still has to be turned to stand upright; 0 where it does. */
+  readonly rotations: ReadonlyMap<number, number>;
   readonly cached: boolean;
 }
 
-const FIELD_LIST = FIELD_CATALOG.map((field) => `  ${field.key} — ${field.label}`).join("\n");
+/** Each field with its subfields, so the routing knows that Grundstücke includes the address. */
+const FIELD_LIST = FIELD_CATALOG.map(
+  (field) => `  ${field.key} — ${field.label}: ${field.subfields.map((subfield) => subfield.label).join(", ")}`,
+).join("\n");
 
 const SYSTEM = `Du bist die Dokumentenaufnahme einer notariellen Zuarbeit für einen Grundstückskaufvertrag.
 
@@ -86,8 +84,8 @@ Seite wozu etwas beitragen kann; ein späterer Schritt liest die Werte.
 
 Liefere:
 
-docType — die Gattung in ein bis drei Worten, wie ein Notariat sie nennt: Grundbuchauszug,
-Energieausweis, Mietübersicht, Flurkarte, Flächenberechnung, Handelsregisterauszug, E-Mail.
+docType — die Gattung, genau einer dieser Namen: ${DOC_TYPES.join(", ")}.
+Passt keiner, nimm Sonstiges.
 
 docDate — das Ausstellungsdatum als YYYY-MM-DD. Nur ein Datum, das im Dokument steht.
 Trägt das Dokument keines, gib null. Rate nicht und leite nichts her.
@@ -106,24 +104,13 @@ status — der Zustand der Datei, nicht der Werte darin:
   notRelevant     kein Feld der Urkunde bezieht sich darauf
   partlyRedacted  Teile sind bewusst unlesbar gemacht
 
-quality — ein kurzer deutscher Halbsatz zur Lesbarkeit, wie ihn ein Sachbearbeiter notieren
-würde: "Scan, 300 dpi, gut lesbar" oder "Foto, Handschrift, Stempel verdeckt die Spalte".
-
-title und subtitle — eine Zeile, die das Dokument benennt, und eine Zeile mit Aussteller
-und Datum.
-
-photoCaption und photoHint — nur wenn die Seiten abfotografiert sind: eine kurze Bildunter-
-schrift und ein Hinweis, was die Lesung erschwert. Sonst beide null.
-
-propertyAddress — die Anschrift des Objekts, um das es in diesem Dokument geht: Straße,
-Hausnummer, Postleitzahl und Ort in einer Zeile. Das ist kein Wert der Urkunde, sondern
-der Name, unter dem das Notariat die Akte führt. Nur wenn die Anschrift im Dokument steht;
-eine Gemarkung oder ein Flurstück ist keine Anschrift. Sonst null.
-
 pages — für jede Seite, die du bekommen hast, genau ein Eintrag:
   number     die Seitenzahl, wie sie im Seitenkopf steht
   role       kurze deutsche Bezeichnung des Abschnitts, etwa "Aufschrift",
              "Bestandsverzeichnis", "Abteilung II", "Deckblatt", "Summenzeile"
+  rotation   um wie viel Grad im Uhrzeigersinn das Bild gedreht werden muss, damit der
+             Text aufrecht steht: 0, 90, 180 oder 270. Für eine Textseite und für ein
+             Bild, das bereits aufrecht steht, 0.
   fieldKeys  die Felder der Urkunde, zu denen diese Seite etwas beitragen kann.
              Eine leere Liste ist eine richtige Antwort für eine Seite ohne Bezug.
              Lieber eine Seite zu viel als eine zu wenig: eine überflüssige Seite kostet
@@ -203,6 +190,7 @@ export const classifyDocument = async (
   // extraction looks at it. A page it invented is dropped the same way.
   const known = new Set(document.pages.map((page) => page.number));
   const routing = new Map<number, readonly FieldId[]>();
+  const rotations = new Map<number, number>();
 
   let facts: DocumentFacts | undefined;
   let cached = true;
@@ -214,24 +202,16 @@ export const classifyDocument = async (
     // The first section carries the title page, the issue date and the stamp, so it is
     // the one that describes the document. Later sections only contribute page roles.
     if (index === 0) {
-      facts = {
-        docType: call.value.docType,
-        docDate: call.value.docDate,
-        sourceClass: call.value.sourceClass,
-        status: call.value.status,
-        quality: call.value.quality,
-        title: call.value.title,
-        subtitle: call.value.subtitle,
-        photoCaption: call.value.photoCaption,
-        photoHint: call.value.photoHint,
-        propertyAddress: call.value.propertyAddress,
-      };
+      const { docType, docDate, sourceClass, status } = call.value;
+      facts = { docType, docDate, sourceClass, status };
     }
     for (const page of call.value.pages) {
-      if (known.has(page.number)) routing.set(page.number, page.fieldKeys);
+      if (!known.has(page.number)) continue;
+      routing.set(page.number, page.fieldKeys);
+      rotations.set(page.number, TURNS.includes(page.rotation) ? page.rotation : 0);
     }
   }
 
   if (facts === undefined) throw new Error(`${document.fileName}: keine Seiten zu klassifizieren.`);
-  return { facts, routing, cached };
+  return { facts, routing, rotations, cached };
 };

@@ -58,21 +58,15 @@ test("an unknown Firmierung yields nothing, because a guessed Rechtsform looks l
 const PAGE_TEXT =
   "Amtsgericht Musterstadt, Grundbuch von Beispielheide, Blatt 00000.\nAbteilung I, Nr. 1:\nMusterhof Grundbesitz mbH.";
 
-const textPage = (): PlannedPage => ({ number: 2, imagePath: "irrelevant.png", width: 1124, height: 1600, text: PAGE_TEXT });
+const textPage = (): PlannedPage => ({ number: 2, imagePath: "irrelevant.png", width: 1124, height: 1600, rotation: 0, text: PAGE_TEXT });
 
-const imagePage = (): PlannedPage => ({ number: 1, imagePath: "photo.png", width: 1600, height: 1200, text: "" });
+const imagePage = (): PlannedPage => ({ number: 1, imagePath: "photo.png", width: 1600, height: 1200, rotation: 0, text: "" });
 
 const FACTS: DocumentFacts = {
   docType: "Grundbuchauszug",
   docDate: "2011-11-15",
   sourceClass: "register",
   status: "outdated",
-  quality: "Scan, gut lesbar",
-  title: "Grundbuch von Beispielheide",
-  subtitle: "Amtsgericht Musterstadt",
-  photoCaption: null,
-  photoHint: null,
-  propertyAddress: "Beispielweg 1, 12345 Beispielheide",
 };
 
 const raw = (over: Partial<RawCandidate> = {}): RawCandidate => ({
@@ -84,9 +78,7 @@ const raw = (over: Partial<RawCandidate> = {}): RawCandidate => ({
   tag: "extracted",
   pageRef: 1,
   quote: "Musterhof Grundbesitz mbH.",
-  crop: null,
-  cropHint: null,
-  cropQuestion: null,
+  box_2d: null,
   confidence: 0.71,
   readings: null,
   rationale: "In Abteilung I als Eigentümerin eingetragen.",
@@ -129,16 +121,12 @@ test("a text page with no quote at all is discarded", () => {
   assert.match(rejected[0]?.reason ?? "", /ohne Zitat/);
 });
 
-test("an image page needs no quote, and its crop is kept", () => {
+test("an image page needs no quote, and its box becomes a crop in fractions of the page", () => {
   const { prepared } = prepareCandidates(
-    merge(
-      [raw({ quote: null, crop: { x: 0.24, y: 0.58, w: 0.44, h: 0.16 }, cropHint: "Summenzeile überschrieben" })],
-      imagePage(),
-    ),
+    merge([raw({ quote: null, box_2d: { ymin: 580, xmin: 240, ymax: 740, xmax: 680 } })], imagePage()),
   );
   assert.equal(prepared.length, 1);
-  assert.equal(prepared[0]?.crop?.x, 0.24);
-  assert.equal(prepared[0]?.crop?.hint, "Summenzeile überschrieben");
+  assert.deepEqual(prepared[0]?.crop, { x: 0.24, y: 0.58, w: 0.44, h: 0.16 });
   assert.equal(prepared[0]?.note, "Bildlesung");
 });
 

@@ -41,7 +41,8 @@ export interface PreparedCandidate {
   readonly sourceLabel: string;
   readonly note: string | null;
   readonly sourceClass: SourceClass;
-  readonly crop: (Rect & { caption: string; hint: string; question: string | null }) | null;
+  /** Fractions of the page, for an image page; null where a quote pins the place instead. */
+  readonly crop: Rect | null;
   readonly confidence: number;
   readonly readings: readonly { value: string; probability: number }[] | null;
   readonly rationale: string;
@@ -90,9 +91,12 @@ const candidateId = (parts: readonly (string | number | null)[]) =>
 
 /* ---------- Display strings the code owns ---------- */
 
-/** "Grundbuchauszug 15.11.2011, S. 2". Built here so every card reads the same way. */
+/**
+ * "Grundbuchauszug 15.11.2011, S. 2". Built here so every card reads the same way. The type
+ * is one of a fixed list; a file that fits none is named by its file name.
+ */
 const sourceLabel = (facts: DocumentFacts, fileName: string, page: number) =>
-  `${facts.docType || fileName} ${formatDate(facts.docDate)}, S. ${page}`;
+  `${facts.docType === "Sonstiges" ? fileName : facts.docType} ${formatDate(facts.docDate)}, S. ${page}`;
 
 /** Short label on the card. The tag is the fallback, so nothing here needs to guess. */
 const noteFor = (hasPageText: boolean, sourceClass: SourceClass): string | null => {
@@ -112,6 +116,16 @@ const CONFIDENCE_FLOOR = 0;
 const CONFIDENCE_CEILING = 1;
 
 const clamp = (value: number) => Math.min(CONFIDENCE_CEILING, Math.max(CONFIDENCE_FLOOR, value));
+
+const GRID = 1000;
+
+/** The model's box on its 0..1000 grid, as fractions of the page. */
+const fromBox = (box: { ymin: number; xmin: number; ymax: number; xmax: number }): Rect => ({
+  x: box.xmin / GRID,
+  y: box.ymin / GRID,
+  w: (box.xmax - box.xmin) / GRID,
+  h: (box.ymax - box.ymin) / GRID,
+});
 
 /**
  * A rectangle cut back to the sheet.
@@ -227,15 +241,7 @@ export const prepareCandidates = (input: MergeInput): MergeOutput => {
       sourceLabel: sourceLabel(facts, offered.fileName, offered.page.number),
       note: noteFor(pageHasText, facts.sourceClass),
       sourceClass: facts.sourceClass,
-      crop:
-        raw.crop === null || pageHasText
-          ? null
-          : {
-              ...onPage(raw.crop),
-              caption: facts.photoCaption ?? facts.docType,
-              hint: raw.cropHint ?? facts.photoHint ?? "",
-              question: raw.cropQuestion,
-            },
+      crop: raw.box_2d === null || pageHasText ? null : onPage(fromBox(raw.box_2d)),
       confidence: clamp(raw.confidence),
       readings: raw.readings === null || raw.readings.length < 2 ? null : raw.readings,
       rationale: raw.rationale,

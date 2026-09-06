@@ -10,6 +10,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+/* With the Anfordern drawer open, tabs, banner and page re-centre in what is left of the width. */
+.content:has([data-drawer]) {
+  padding-right: var(--drawer-width);
+}
 .band {
   width: var(--page-width);
   max-width: 100%;

@@ -5,9 +5,8 @@ import { loadCaseView, type CaseParams } from "@/lib/load";
 export default async function RequestPage({ params }: { params: CaseParams }) {
   const view = await loadCaseView(params);
   return (
-    <>
+    <RequestBasket view={view}>
       <DeedData view={view} />
-      <RequestBasket view={view} />
-    </>
+    </RequestBasket>
   );
 }

@@ -1,7 +1,7 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileType } from "@/lib/documents";
-import { canRender, locateQuotes, renderPages } from "@/lib/pages";
+import { canRender, locateQuotes, renderPages, renderTurned } from "@/lib/pages";
 import { documentsDirectory, int, query, queryOne, text, textOrNull, transaction } from "./connect";
 
 /**
@@ -118,6 +118,33 @@ export const renderDocumentPages = async (caseId: string, documentKey: string): 
   return { documentId, pageCount: rendered.length };
 };
 
+/**
+ * Turns one page upright: renders it again from the original with the given total turn,
+ * replaces its image in place and records the turn. Everything that reads the page
+ * afterwards -- the extraction, the viewer, the marker -- sees the same picture.
+ */
+export const turnDocumentPage = async (caseId: string, documentKey: string, number: number, rotation: number): Promise<void> => {
+  const row = await findDocument(caseId, documentKey);
+  const storagePath = row === undefined ? null : textOrNull(row.storage_path);
+  if (row === undefined || storagePath === null) return;
+  const documentId = text(row.id);
+  const pageRow = await queryOne("SELECT image_path FROM page WHERE document_id = $1 AND number = $2", documentId, number);
+  const imagePath = pageRow === undefined ? null : textOrNull(pageRow.image_path);
+  if (imagePath === null) return;
+
+  const bytes = await readFile(path.join(documentsDirectory(), storagePath));
+  const page = await renderTurned(bytes, contentTypeOf(text(row.file_name)), number, rotation);
+  await writeFile(path.join(documentsDirectory(), imagePath), page.png);
+  await query(
+    "UPDATE page SET width = $1, height = $2, rotation = $3 WHERE document_id = $4 AND number = $5",
+    page.width,
+    page.height,
+    rotation,
+    documentId,
+    number,
+  );
+};
+
 const FRACTION = 100;
 
 /**
@@ -140,9 +167,11 @@ export const locateDocumentQuotes = async (caseId: string, documentKey: string):
   if (fileType(text(row.file_name)).form === "text") return NO_QUOTES;
 
   const documentId = text(row.id);
+  // With the page's turn, so the marker lands on the image as it is stored.
   const candidates = await query(
-    `SELECT id, page, quote FROM candidate
-     WHERE document_id = $1 AND quote IS NOT NULL AND page IS NOT NULL AND crop IS NULL`,
+    `SELECT c.id, c.page, c.quote, p.rotation FROM candidate c
+     JOIN page p ON p.document_id = c.document_id AND p.number = c.page
+     WHERE c.document_id = $1 AND c.quote IS NOT NULL AND c.crop IS NULL`,
     documentId,
   );
   if (candidates.length === 0) return NO_QUOTES;
@@ -151,7 +180,7 @@ export const locateDocumentQuotes = async (caseId: string, documentKey: string):
   const located = await locateQuotes(
     bytes,
     contentTypeOf(text(row.file_name)),
-    candidates.map((candidate) => ({ page: int(candidate.page), quote: text(candidate.quote) })),
+    candidates.map((candidate) => ({ page: int(candidate.page), quote: text(candidate.quote), rotation: int(candidate.rotation) })),
   );
 
   let quotesLocated = 0;
@@ -164,15 +193,11 @@ export const locateDocumentQuotes = async (caseId: string, documentKey: string):
       continue;
     }
     const { rect } = hit;
-    await query("UPDATE candidate SET crop = $1 WHERE id = $2", JSON.stringify({
-      x: rect.x / FRACTION,
-      y: rect.y / FRACTION,
-      w: rect.w / FRACTION,
-      h: rect.h / FRACTION,
-      caption: `Seite ${int(candidate.page)}`,
-      hint: "",
-      question: null,
-    }), text(candidate.id));
+    await query(
+      "UPDATE candidate SET crop = $1 WHERE id = $2",
+      JSON.stringify({ x: rect.x / FRACTION, y: rect.y / FRACTION, w: rect.w / FRACTION, h: rect.h / FRACTION }),
+      text(candidate.id),
+    );
     quotesLocated += 1;
   }
   return { quotesLocated, quotesAmbiguous };

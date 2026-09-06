@@ -1,6 +1,6 @@
 import { Table, type Column } from "@/components/ui/Table";
 import type { CandidateTarget, CaseView, EncumbranceRow, Field, ReviewPart } from "@/domain/model";
-import { PART_NONE, partAnchor, routes } from "@/lib/routes";
+import { partAnchor, routes } from "@/lib/routes";
 import { PartDetail } from "./PartDetail";
 
 interface PartTableProps<Row extends ReviewPart> {
@@ -42,7 +42,7 @@ export function PartTable<Row extends ReviewPart>({
         id: partAnchor(field.id, r.id),
         open: r.id === openId,
         openHref: routes.case(caseId, field.id, { part: r.id }),
-        closedHref: routes.case(caseId, field.id, { part: PART_NONE }),
+        closedHref: routes.case(caseId, field.id),
         content: (
           <PartDetail
             view={view}

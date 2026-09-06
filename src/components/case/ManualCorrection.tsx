@@ -51,7 +51,6 @@ export function ManualCorrection({ caseId, fieldId, partId, fieldLabel, partLabe
       </Button>
       {open && (
         <Overlay
-          placement="center"
           onClose={close}
           title={
             <>

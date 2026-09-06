@@ -79,7 +79,9 @@ Der Vorgang läuft im Browser rund, ohne Kommandozeile:
 2. **Durchlauf starten** — der Knopf im Banner und über der Dateiliste. Er kommt sofort
    zurück, der Durchlauf läuft im Hintergrund weiter. Die Seite zeigt währenddessen den
    Fortschritt je Dokument und lädt sich selbst nach; **Abbrechen** stoppt die laufenden
-   Modellaufrufe und gibt die Dateien für einen erneuten Durchlauf frei.
+   Modellaufrufe und gibt die Dateien für einen erneuten Durchlauf frei. Eine Seite, die
+   auf der Seite liegt, wird vor dem Lesen aufrecht gedreht, damit Fundstellen und
+   Seitenansicht dasselbe Bild zeigen.
 3. **Urkundendaten** — jeder Wert mit seiner Fundstelle: dem Zitat aus der Seite und dem
    Ausschnitt des Seitenbilds, auf dem es steht. Bestätigen, einen anderen Kandidaten
    wählen oder mit Begründung korrigieren.
@@ -107,8 +109,8 @@ Textebene etwas.
 | `docker compose down -v` | alles entfernen, auch die Volumes |
 
 Der Dev-Server darf während `db:reset` weiterlaufen: er legt das Schema beim nächsten
-Zugriff neu an. Nach einer Schemaänderung ist `db:reset` nötig, denn das Schema wird
-angelegt, nicht migriert.
+Zugriff neu an. Schemaänderungen stehen als idempotente `ALTER`-Anweisungen im Schema und
+ziehen beim nächsten Start nach; ein Reset ist dafür nicht nötig.
 
 ## Wie die Daten liegen
 
@@ -124,10 +126,17 @@ abgeleitet wurde. Ohne eines davon weist die Datenbank ihn per CHECK zurück.
 
 **Kein Status ohne Grund.** Der Status wird nie gespeichert, sondern aus den Zeilen berechnet
 ([`src/domain/computeStatus.ts`](src/domain/computeStatus.ts)). Dieselbe Funktion liefert
-Badge, Feldstatus, Balken, Zähler und Export, deshalb kann ein Wert nicht an einer Stelle
+Badge, Feldstatus, Balken, Zähler und Befund, deshalb kann ein Wert nicht an einer Stelle
 bestätigt und an anderer offen aussehen. Die Bestätigung gilt genau einem Kandidaten: wird
 ein anderer gewählt, ist das Unterfeld ohne weiteres Zutun wieder unbestätigt, und ein davon
 abgeleiteter Wert verfällt.
+
+**Kein Satz vom Modell.** Auch der Befund unter einem Wert ist berechnet, nicht geschrieben:
+zu jeder Regel gibt es einen Satz, und was ihn füllt, sind Daten — der Wert, seine Quelle,
+ein Datum, eine Schwelle (`explainStatus`). Passt keine Regel, steht der Status allein; ein
+nacktes „widersprüchlich" ist wahr, eine erfundene Erklärung sähe nur so aus. Das Modell
+liest Werte, nennt Fundstellen und wählt aus festen Listen; formulieren tut es nichts, was
+im Browser erscheint.
 
 Das vollständige Schema mit Begründungen steht in [`src/db/schema.sql`](src/db/schema.sql),
 das Modell dahinter in [`docs/Plan/Datenmodell.md`](docs/Plan/Datenmodell.md).
@@ -141,14 +150,14 @@ bleibt ein Verzeichnis plus ein Dump.
 ```
 src/catalog/     Feldkatalog: die zehn Felder, ihre Unterfelder, Fristen, Anforderungstexte
 src/db/          Schema, Verbindung, Repository, Mutationen, Dateiablage, Vorgangsanlage
-src/agent/       Der Durchlauf: Plan, die drei Modellstufen, Merge, Statusabgleich
+src/agent/       Der Durchlauf: Plan, zwei Modellstufen (Einordnung, Extraktion), Merge, Ableitungen
 src/domain/      Modell, Statusberechnung, Kanonisierung, abgeleitete Werte
 src/components/  UI, nach Bausteinen (ui/) und Vorgangsansicht (case/) getrennt
 src/app/         Routen und Server Actions
 ```
 
-Der Feldkatalog ist die Autorität, nicht die Datenbank: jeder Vorgang wird daraus angelegt
-und merkt sich seine Katalogversion, damit ältere Vorgänge ihre Form behalten.
+Der Feldkatalog ist die Autorität, nicht die Datenbank: jeder Vorgang wird daraus angelegt,
+und ein Durchlauf ergänzt vorher, was der Katalog seither dazubekommen hat.
 
 Eine Vorgangsansicht kostet ein Bündel paralleler Abfragen, unabhängig davon, wie viele
 Felder sie enthält; die Vorgangsliste kostet dasselbe wie ein einzelner Vorgang.

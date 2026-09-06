@@ -85,17 +85,15 @@ const storeDocument = async (caseId: string, fileName: string, bytes: Uint8Array
   const documentId = `${caseId}:${hash.slice(0, 12)}`;
   await query(
     `INSERT INTO document (id, case_id, file_name, storage_path, hash, doc_type, kind, doc_date, page_count,
-                           source_class, quality, status, title, subtitle, received_in_run, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, 0, 'partyStatement', '', 'unconfirmed', $8, '', $9,
+                           source_class, status, received_in_run, sort_order)
+     VALUES ($1, $2, $3, $4, $5, 'Sonstiges', $6, NULL, 0, 'partyStatement', 'unconfirmed', $7,
              (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM document WHERE case_id = $2))`,
     documentId,
     caseId,
     fileName,
     relative,
     hash,
-    "noch nicht ausgewertet",
     fileType(fileName).kind,
-    fileName,
     await receivingRun(caseId),
   );
   return { documentId, attachedToExisting: false };

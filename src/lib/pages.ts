@@ -14,7 +14,14 @@ import type { Rect } from "@/domain/model";
  * Page text and character positions come from one walk, so the string a run hands the
  * model is exactly the string a quote is later found in. Nothing else can drift between
  * "what the model read" and "what the marker points at".
+ *
+ * A page that lies on its side is rendered again, turned upright, before anything reads
+ * values off it (`renderTurned`); the quote geometry applies the same turn, so a marker
+ * lands on the picture the viewer shows.
  */
+
+type MupdfModule = typeof import("mupdf");
+type MupdfPageObject = ReturnType<InstanceType<MupdfModule["Document"]>["loadPage"]>;
 
 export interface RenderedPage {
   /** 1-based, as people and the UI count pages. */
@@ -46,11 +53,18 @@ export const canRender = (contentType: string) => RENDERABLE.has(contentType);
 
 type Quad = [number, number, number, number, number, number, number, number];
 
+export interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 interface PageContent {
   text: string;
   /** Box per code unit of `text`; null for the newlines the walk inserts between lines. */
   quads: (Quad | null)[];
-  bounds: { x: number; y: number; width: number; height: number };
+  bounds: Bounds;
 }
 
 // Minimal shape of the MuPDF page, so this module does not depend on the import's types.
@@ -135,6 +149,50 @@ const normalize = (raw: string): Normalized => {
   return { text, source };
 };
 
+/* ---------- Turning a page upright ---------- */
+
+/**
+ * A point of the page under the turn the renderer applies. MuPDF's rotation matrix is
+ * [cos sin -sin cos], which in the page's y-down space turns clockwise: the top edge of
+ * a page turned by 90 becomes its right edge. Rounded, so a quarter turn is exact.
+ */
+export const turned = (x: number, y: number, rotation: number): [number, number] => {
+  const radians = (rotation * Math.PI) / 180;
+  const cos = Math.round(Math.cos(radians));
+  const sin = Math.round(Math.sin(radians));
+  return [x * cos - y * sin, x * sin + y * cos];
+};
+
+const extent = (points: readonly [number, number][]) => {
+  const xs = points.map(([x]) => x);
+  const ys = points.map(([, y]) => y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  return { left, top, width: Math.max(...xs) - left, height: Math.max(...ys) - top };
+};
+
+/**
+ * The share of the turned page that a set of points covers, in percent, as the UI draws
+ * a marker. The sheet is turned the same way the pixmap was, so the fractions refer to the
+ * image that is actually on disk.
+ */
+export const fractionsOf = (points: readonly [number, number][], bounds: Bounds, rotation: number): Rect => {
+  const corners: [number, number][] = [
+    [bounds.x, bounds.y],
+    [bounds.x + bounds.width, bounds.y],
+    [bounds.x, bounds.y + bounds.height],
+    [bounds.x + bounds.width, bounds.y + bounds.height],
+  ];
+  const sheet = extent(corners.map(([x, y]) => turned(x, y, rotation)));
+  const marks = extent(points.map(([x, y]) => turned(x, y, rotation)));
+  return {
+    x: ((marks.left - sheet.left) / sheet.width) * PERCENT,
+    y: ((marks.top - sheet.top) / sheet.height) * PERCENT,
+    w: (marks.width / sheet.width) * PERCENT,
+    h: (marks.height / sheet.height) * PERCENT,
+  };
+};
+
 /* ---------- Locating ---------- */
 
 export interface Located {
@@ -144,24 +202,19 @@ export interface Located {
   hits: number;
 }
 
-const unionRect = (content: PageContent, from: number, to: number): Rect | undefined => {
+const unionRect = (content: PageContent, from: number, to: number, rotation: number): Rect | undefined => {
   const found = content.quads.slice(from, to + 1).filter((quad): quad is Quad => quad !== null);
   if (found.length === 0) return undefined;
-
-  const xs = found.flatMap((q) => [q[0], q[2], q[4], q[6]]);
-  const ys = found.flatMap((q) => [q[1], q[3], q[5], q[7]]);
-  const { bounds } = content;
-  const left = Math.min(...xs);
-  const top = Math.min(...ys);
-  return {
-    x: ((left - bounds.x) / bounds.width) * PERCENT,
-    y: ((top - bounds.y) / bounds.height) * PERCENT,
-    w: ((Math.max(...xs) - left) / bounds.width) * PERCENT,
-    h: ((Math.max(...ys) - top) / bounds.height) * PERCENT,
-  };
+  const points = found.flatMap((q): [number, number][] => [
+    [q[0], q[1]],
+    [q[2], q[3]],
+    [q[4], q[5]],
+    [q[6], q[7]],
+  ]);
+  return fractionsOf(points, content.bounds, rotation);
 };
 
-const locateIn = (content: PageContent, quote: string): Located | undefined => {
+const locateIn = (content: PageContent, quote: string, rotation: number): Located | undefined => {
   const haystack = normalize(content.text);
   const needle = normalize(quote).text;
   if (needle === "" || haystack.text === "") return undefined;
@@ -173,7 +226,7 @@ const locateIn = (content: PageContent, quote: string): Located | undefined => {
   const first = starts[0] ?? 0;
   const from = haystack.source[first] ?? 0;
   const to = haystack.source[first + needle.length - 1] ?? from;
-  const rect = unionRect(content, from, to);
+  const rect = unionRect(content, from, to, rotation);
   return rect === undefined ? undefined : { rect, hits: starts.length };
 };
 
@@ -181,6 +234,8 @@ export interface QuoteRequest {
   /** 1-based page number the candidate names. */
   page: number;
   quote: string;
+  /** Degrees clockwise the stored page image was turned; the marker follows. */
+  rotation: number;
 }
 
 /**
@@ -208,7 +263,7 @@ export const locateQuotes = async (
       try {
         const content = readPage(page as unknown as MupdfPage);
         requests.forEach((request, index) => {
-          if (request.page === number) results[index] = locateIn(content, request.quote);
+          if (request.page === number) results[index] = locateIn(content, request.quote, request.rotation);
         });
       } finally {
         page.destroy();
@@ -222,14 +277,28 @@ export const locateQuotes = async (
 
 /* ---------- Rendering ---------- */
 
+const renderOne = (mupdf: MupdfModule, page: MupdfPageObject, number: number, rotation: number, options: RenderOptions): RenderedPage => {
+  const maxEdge = options.maxEdge ?? DEFAULT_MAX_EDGE;
+  const baseScale = options.scale ?? DEFAULT_SCALE;
+  const content = readPage(page as unknown as MupdfPage);
+  const longEdge = Math.max(content.bounds.width, content.bounds.height) * baseScale;
+  const scale = longEdge > maxEdge ? baseScale * (maxEdge / longEdge) : baseScale;
+  // The turn comes after the scale; the pixmap covers the turned bounds by itself.
+  const matrix = mupdf.Matrix.concat(mupdf.Matrix.scale(scale, scale), mupdf.Matrix.rotate(rotation));
+  const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
+  try {
+    return { number, width: pixmap.getWidth(), height: pixmap.getHeight(), png: pixmap.asPNG(), text: content.text };
+  } finally {
+    pixmap.destroy();
+  }
+};
+
 /**
  * Renders every page of `bytes`. `contentType` decides the parser; a JPEG or PNG is a
  * one-page document. The whole document is decoded once and pages are produced one by
  * one, so a long scan never holds all its images in memory at the same time.
  */
 export async function* renderPages(bytes: Uint8Array, contentType: string, options: RenderOptions = {}): AsyncGenerator<RenderedPage> {
-  const maxEdge = options.maxEdge ?? DEFAULT_MAX_EDGE;
-  const baseScale = options.scale ?? DEFAULT_SCALE;
   // Loaded on demand: the WebAssembly module is several megabytes and only page rendering needs it.
   const mupdf = await import("mupdf");
   const document = mupdf.Document.openDocument(bytes, contentType);
@@ -238,15 +307,7 @@ export async function* renderPages(bytes: Uint8Array, contentType: string, optio
     for (let index = 0; index < count; index += 1) {
       const page = document.loadPage(index);
       try {
-        const content = readPage(page as unknown as MupdfPage);
-        const longEdge = Math.max(content.bounds.width, content.bounds.height) * baseScale;
-        const scale = longEdge > maxEdge ? baseScale * (maxEdge / longEdge) : baseScale;
-        const pixmap = page.toPixmap([scale, 0, 0, scale, 0, 0], mupdf.ColorSpace.DeviceRGB, false, true);
-        try {
-          yield { number: index + 1, width: pixmap.getWidth(), height: pixmap.getHeight(), png: pixmap.asPNG(), text: content.text };
-        } finally {
-          pixmap.destroy();
-        }
+        yield renderOne(mupdf, page, index + 1, 0, options);
       } finally {
         page.destroy();
       }
@@ -255,3 +316,19 @@ export async function* renderPages(bytes: Uint8Array, contentType: string, optio
     document.destroy();
   }
 }
+
+/** One page again, turned by `rotation` degrees clockwise: a scan that lay on its side. */
+export const renderTurned = async (bytes: Uint8Array, contentType: string, number: number, rotation: number): Promise<RenderedPage> => {
+  const mupdf = await import("mupdf");
+  const document = mupdf.Document.openDocument(bytes, contentType);
+  try {
+    const page = document.loadPage(number - 1);
+    try {
+      return renderOne(mupdf, page, number, rotation, {});
+    } finally {
+      page.destroy();
+    }
+  } finally {
+    document.destroy();
+  }
+};

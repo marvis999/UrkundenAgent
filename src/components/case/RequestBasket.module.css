@@ -1,5 +1,46 @@
+/* A drawer under the header, flush right, full height. Not a modal: the case chrome moves
+   everything else out from under it (see CaseChrome.module.css), so the main view keeps
+   working next to it. */
+.panel {
+  position: fixed;
+  top: var(--topbar-height);
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  width: var(--drawer-width);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  box-shadow: inset var(--hairline) 0 0 var(--color-border);
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  font-weight: 600;
+  font-size: var(--text-md);
+}
 .body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--space-5);
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-sunken);
 }
 .footerActions {
   display: flex;

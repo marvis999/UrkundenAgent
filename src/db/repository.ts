@@ -2,6 +2,7 @@ import { cache } from "react";
 import { fieldDefinition } from "@/catalog/fields";
 import {
   computeSubfieldStatus,
+  explainStatus,
   type CandidateTag,
   type StatusCandidate,
   type StatusContext,
@@ -18,14 +19,12 @@ import type {
   Field,
   FieldId,
   FieldTable,
-  Finding,
   HistoryEntry,
   ImageEvidence,
   ParcelRow,
   Reading,
   Rect,
   RequestItem,
-  RequestTemplate,
   Run,
   Subfield,
 } from "@/domain/model";
@@ -56,14 +55,8 @@ const unscope = (caseId: string, id: string) => (id.startsWith(`${caseId}:`) ? i
 
 /* ---------- Narrowing rows ---------- */
 
-interface StoredCrop extends Rect {
-  caption: string;
-  hint: string;
-  question: string | null;
-}
-
-const imageOf = (row: Row): ImageEvidence | undefined => {
-  const stored = json<StoredCrop>(row.crop);
+const imageOf = (row: Row, caption: string): ImageEvidence | undefined => {
+  const stored = json<Rect>(row.crop);
   if (!stored) return undefined;
   const readings = json<Reading[]>(row.readings);
   const width = int(row.page_width);
@@ -72,9 +65,7 @@ const imageOf = (row: Row): ImageEvidence | undefined => {
     ...(width > 0 && height > 0 ? { pageAspect: height / width } : {}),
     // Stored as fractions of the page so the marker survives any render size.
     crop: { x: stored.x * PERCENT, y: stored.y * PERCENT, w: stored.w * PERCENT, h: stored.h * PERCENT },
-    caption: stored.caption,
-    hint: stored.hint,
-    ...(stored.question === null ? {} : { question: stored.question }),
+    caption,
     ...(readings === undefined ? {} : { readings }),
   };
 };
@@ -89,7 +80,8 @@ export const toStatusCandidate = (row: Row): StatusCandidate => ({
   tag: text(row.tag) as CandidateTag,
   documentId: textOrNull(row.document_id),
   confidence: numberOrNull(row.confidence),
-  hasReadings: json<Reading[]>(row.readings) !== undefined,
+  readings: (json<Reading[]>(row.readings) ?? []).map((reading) => reading.value),
+  sourceLabel: text(row.source_label),
 });
 
 export const toStatusSubfield = (row: Row): StatusSubfield => ({
@@ -104,9 +96,10 @@ export const toStatusSubfield = (row: Row): StatusSubfield => ({
 const present = <Key extends string, Value>(key: Key, value: Value | null | undefined): Partial<Record<Key, Value>> =>
   value === null || value === undefined ? {} : ({ [key]: value } as Record<Key, Value>);
 
-const toCandidate = (row: Row, target: CandidateTarget, chosenId: string | null, documentKeys: Map<string, string>): Candidate => {
+const toCandidate = (row: Row, target: CandidateTarget, chosenId: string | null, documents: Map<string, Document>): Candidate => {
   const documentId = textOrNull(row.document_id);
-  const image = imageOf(row);
+  const document = documentId === null ? undefined : documents.get(documentId);
+  const image = imageOf(row, document?.type ?? "");
   return {
     id: text(row.id),
     target,
@@ -116,7 +109,7 @@ const toCandidate = (row: Row, target: CandidateTarget, chosenId: string | null,
     isActive: text(row.id) === chosenId,
     ...present("note", textOrNull(row.note)),
     ...present("sourceClass", textOrNull(row.source_class) as SourceClass | null),
-    ...present("documentId", documentId === null ? null : documentKeys.get(documentId)),
+    ...present("documentId", document?.id),
     ...present("page", intOrNull(row.page)),
     ...present("confidence", numberOrNull(row.confidence)),
     ...present("quote", textOrNull(row.quote)),
@@ -125,26 +118,18 @@ const toCandidate = (row: Row, target: CandidateTarget, chosenId: string | null,
   };
 };
 
-const toDocument = (row: Row, caseId: string, lastFinishedRun: number, hasPages: boolean): Document => {
-  const caption = textOrNull(row.photo_caption);
-  const hint = textOrNull(row.photo_hint);
-  return {
-    id: unscope(caseId, text(row.id)),
-    fileName: text(row.file_name),
-    type: text(row.doc_type),
-    kind: text(row.kind) as DocumentKind,
-    date: formatDate(dateOrNull(row.doc_date)),
-    pageCount: int(row.page_count),
-    status: text(row.status) as DocumentStatus,
-    sourceClass: text(row.source_class) as SourceClass,
-    quality: text(row.quality),
-    title: text(row.title),
-    subtitle: text(row.subtitle),
-    ...(caption === null || hint === null ? {} : { photoNote: { caption, hint } }),
-    ...(int(row.received_in_run) > lastFinishedRun ? { isNew: true } : {}),
-    ...(hasPages ? { hasPages: true } : {}),
-  };
-};
+const toDocument = (row: Row, caseId: string, lastFinishedRun: number, hasPages: boolean): Document => ({
+  id: unscope(caseId, text(row.id)),
+  fileName: text(row.file_name),
+  type: text(row.doc_type),
+  kind: text(row.kind) as DocumentKind,
+  date: formatDate(dateOrNull(row.doc_date)),
+  pageCount: int(row.page_count),
+  status: text(row.status) as DocumentStatus,
+  sourceClass: text(row.source_class) as SourceClass,
+  ...(int(row.received_in_run) > lastFinishedRun ? { isNew: true } : {}),
+  ...(hasPages ? { hasPages: true } : {}),
+});
 
 const toHistory = (row: Row): HistoryEntry => ({
   run: int(row.run),
@@ -152,8 +137,6 @@ const toHistory = (row: Row): HistoryEntry => ({
   actor: text(row.actor) as Actor,
   text: text(row.text),
 });
-
-const toFinding = (row: Row): Finding => ({ title: text(row.title), text: text(row.text) });
 
 const toRequestItem = (row: Row): RequestItem => ({
   fieldId: text(row.field_key) as FieldId,
@@ -168,7 +151,7 @@ const toRequestItem = (row: Row): RequestItem => ({
 const grouped = <T>(rows: readonly Row[], keyOf: (row: Row) => string, map: (row: Row) => T): Map<string, T[]> =>
   new Map([...Map.groupBy(rows, keyOf)].map(([key, group]) => [key, group.map(map)]));
 
-/** Findings and history hang off a subfield, a table row or the field itself. */
+/** History hangs off a subfield, a table row or the field itself. */
 const ownerOf = (row: Row) => textOrNull(row.subfield_id) ?? textOrNull(row.table_row_id) ?? text(row.field_id);
 
 /* ---------- Loading ---------- */
@@ -183,7 +166,7 @@ const loadRows = async (caseId: string | null) => {
   const byCase = scope("case_id");
   const byField = scope("f.case_id");
 
-  const [cases, runs, documents, fields, subfields, tableRows, candidates, findings, history, requests, requestItems, progress, renderedPages] =
+  const [cases, runs, documents, fields, subfields, tableRows, candidates, history, requests, requestItems, progress, renderedPages] =
     await Promise.all([
       query(`SELECT * FROM case_file WHERE ${scope("id")} ORDER BY changed_at DESC`, caseId),
       query(`SELECT * FROM run WHERE ${byCase} ORDER BY case_id, number`, caseId),
@@ -209,11 +192,8 @@ const loadRows = async (caseId: string | null) => {
          WHERE ${byField} ORDER BY c.created_at, c.id`,
         caseId,
       ),
-      query(`SELECT fi.* FROM finding fi JOIN field f ON f.id = fi.field_id WHERE ${byField}`, caseId),
-      query(
-        `SELECT h.* FROM history h JOIN field f ON f.id = h.field_id WHERE ${byField} ORDER BY h.run, h.written_at, h.id`,
-        caseId,
-      ),
+      // Newest first: the last change is the one a person opens the Verlauf for.
+      query(`SELECT h.* FROM history h JOIN field f ON f.id = h.field_id WHERE ${byField} ORDER BY h.written_at DESC, h.id DESC`, caseId),
       query(`SELECT * FROM request WHERE ${byCase} ORDER BY run`, caseId),
       query(
         `SELECT i.*, r.case_id, r.run AS request_run, r.sent_at, r.recipient, f.key AS field_key
@@ -238,7 +218,7 @@ const loadRows = async (caseId: string | null) => {
       ),
     ]);
 
-  return { cases, runs, documents, fields, subfields, tableRows, candidates, findings, history, requests, requestItems, progress, renderedPages };
+  return { cases, runs, documents, fields, subfields, tableRows, candidates, history, requests, requestItems, progress, renderedPages };
 };
 
 type LoadedRows = Awaited<ReturnType<typeof loadRows>>;
@@ -249,12 +229,12 @@ const FIRST_RUN = 1;
 
 interface CaseContext extends StatusContext {
   caseId: string;
-  documentKeys: Map<string, string>;
+  /** The view's documents by store id, for the key and the type a candidate shows. */
+  documents: Map<string, Document>;
   candidatesBySubfield: Map<string, Row[]>;
   candidatesByRow: Map<string, Row[]>;
   subfieldsByField: Map<string, Row[]>;
   rowsByField: Map<string, Row[]>;
-  findings: Map<string, Finding[]>;
   history: Map<string, HistoryEntry[]>;
   /** Field key to the date of a sent request no later run has reconciled. */
   requestedAt: Map<string, string>;
@@ -278,7 +258,9 @@ const buildSubfields = (fieldRowId: string, context: CaseContext): BuiltSubfield
     const chosenId = textOrNull(row.chosen_candidate_id);
     if (rows.some((candidate) => int(candidate.run) > FIRST_RUN)) touchedByLaterRun = true;
 
-    const status = computeSubfieldStatus(toStatusSubfield(row), rows.map(toStatusCandidate), context);
+    const statusSubfield = toStatusSubfield(row);
+    const statusCandidates = rows.map(toStatusCandidate);
+    const status = computeSubfieldStatus(statusSubfield, statusCandidates, context);
 
     const chosen = rows.find((candidate) => text(candidate.id) === chosenId);
     subfields.push({
@@ -288,11 +270,12 @@ const buildSubfields = (fieldRowId: string, context: CaseContext): BuiltSubfield
       // With no candidate there is no source, so the absence note stands in its place.
       sourceLabel: chosen === undefined ? text(row.absence_note) : text(chosen.source_label),
       status,
-      ...present("finding", context.findings.get(id)?.[0]),
+      // The rule that fired, in the code's words. Never a model's.
+      ...present("finding", explainStatus(status, statusSubfield, statusCandidates, context)),
       ...present("history", context.history.get(id)),
     });
     const target: CandidateTarget = { kind: "subfield", subfieldId: key };
-    candidates.push(...rows.map((candidate) => toCandidate(candidate, target, chosenId, context.documentKeys)));
+    candidates.push(...rows.map((candidate) => toCandidate(candidate, target, chosenId, context.documents)));
   }
 
   return { subfields, candidates, touchedByLaterRun };
@@ -320,7 +303,6 @@ const buildTable = (fieldRowId: string, fieldKey: FieldId, context: CaseContext)
     const part = {
       id: key,
       status: text(row.status) as FieldStatus,
-      ...present("finding", context.findings.get(id)?.[0]),
       ...present("history", context.history.get(id)),
     };
 
@@ -346,7 +328,7 @@ const buildTable = (fieldRowId: string, fieldKey: FieldId, context: CaseContext)
     const chosenId = textOrNull(row.chosen_candidate_id);
     const target: CandidateTarget = { kind: "row", rowId: key };
     candidates.push(
-      ...(context.candidatesByRow.get(id) ?? []).map((candidate) => toCandidate(candidate, target, chosenId, context.documentKeys)),
+      ...(context.candidatesByRow.get(id) ?? []).map((candidate) => toCandidate(candidate, target, chosenId, context.documents)),
     );
   }
 
@@ -356,18 +338,6 @@ const buildTable = (fieldRowId: string, fieldKey: FieldId, context: CaseContext)
     candidates,
     data,
   };
-};
-
-/**
- * What to request for this field. A run writes the wording for the case at hand -- naming
- * the document and the date it stumbled over -- and the catalog template stands in until
- * one has. Both halves must be present before the stored text wins, so a half-written row
- * cannot leave the basket with a title and no text.
- */
-const requestOf = (row: Row, fallback: RequestTemplate | undefined): RequestTemplate | undefined => {
-  const title = textOrNull(row.request_title);
-  const text = textOrNull(row.request_text);
-  return title !== null && text !== null ? { title, text } : fallback;
 };
 
 const buildField = (row: Row, context: CaseContext): Field | undefined => {
@@ -389,8 +359,7 @@ const buildField = (row: Row, context: CaseContext): Field | undefined => {
     subfields,
     ...(table === undefined ? {} : { table }),
     candidates: [...candidates, ...rowCandidates],
-    ...present("request", requestOf(row, definition.request)),
-    ...present("noRequestReason", textOrNull(row.no_request_reason)),
+    ...present("request", definition.request),
     ...present("requestedAt", context.requestedAt.get(key)),
     ...(touchedByLaterRun ? { isNew: true } : {}),
     history: context.history.get(id) ?? [],
@@ -416,7 +385,10 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
   const nextRun = unfinishedRun === undefined ? lastFinishedRun + 1 : int(unfinishedRun.number);
 
   const documentRows = forCase(rows.documents);
-  const documentKeys = new Map(documentRows.map((row) => [text(row.id), unscope(caseId, text(row.id))]));
+  const rendered = new Set(forCase(rows.renderedPages).map((row) => text(row.document_id)));
+  const documentById = new Map(
+    documentRows.map((row) => [text(row.id), toDocument(row, caseId, lastFinishedRun, rendered.has(text(row.id)))]),
+  );
   const documentDates = new Map(
     documentRows.filter((row) => dateOrNull(row.doc_date) !== null).map((row) => [text(row.id), dateOrNull(row.doc_date) ?? ""]),
   );
@@ -430,12 +402,11 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
     caseId,
     today,
     documentDate: (id) => documentDates.get(id),
-    documentKeys,
+    documents: documentById,
     subfieldsByField: Map.groupBy(forCase(rows.subfields), (row) => text(row.field_id)),
     rowsByField: Map.groupBy(forCase(rows.tableRows), (row) => text(row.field_id)),
     candidatesBySubfield: Map.groupBy(forCase(rows.candidates), (row) => text(row.subfield_id)),
     candidatesByRow: Map.groupBy(forCase(rows.candidates), (row) => text(row.table_row_id)),
-    findings: grouped(rows.findings, ownerOf, toFinding),
     history: grouped(rows.history, ownerOf, toHistory),
     requestedAt: new Map(openItems.map((row) => [text(row.field_key), formatTimestampDate(timestampOrNull(row.sent_at) ?? "")])),
   };
@@ -443,8 +414,7 @@ const buildCaseView = (caseRow: Row, rows: LoadedRows, today: string): CaseView 
   const fields = forCase(rows.fields)
     .map((fieldRow) => buildField(fieldRow, context))
     .filter((field): field is Field => field !== undefined);
-  const rendered = new Set(forCase(rows.renderedPages).map((row) => text(row.document_id)));
-  const documents = documentRows.map((row) => toDocument(row, caseId, lastFinishedRun, rendered.has(text(row.id))));
+  const documents = [...documentById.values()];
 
   // A request sent during run N is reconciled by run N + 1, which reports what it settled.
   const resolvedByRun = grouped(

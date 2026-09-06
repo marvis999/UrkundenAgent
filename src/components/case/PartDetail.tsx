@@ -109,7 +109,7 @@ export function PartDetail({ view, field, part, label, target, noEvidenceText, c
               currentValue={currentValue}
             />
           )}
-          {part.status === "redacted" && field.noRequestReason && <Text variant="muted">{field.noRequestReason}</Text>}
+          {part.status === "redacted" && <Text variant="muted">Geschwärzt: kein fehlender Wert, nichts anzufordern.</Text>}
         </div>
         {requestIsOut && field.requestedAt && <Text variant="muted">angefordert am {field.requestedAt}</Text>}
         {canRequest && (

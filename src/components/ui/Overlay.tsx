@@ -13,13 +13,11 @@ interface OverlayProps {
   closeHref?: string;
   onClose?: () => void;
   footer?: ReactNode;
-  /** side = full-height drawer on the right, center = centered modal. */
-  placement: "side" | "center";
   children: ReactNode;
 }
 
-/** Modal frame for the request basket, the document viewer and the manual-correction dialog. */
-export function Overlay({ title, headerEnd, closeHref, onClose, footer, placement, children }: OverlayProps) {
+/** Centered modal: the document viewer, the note and the manual-correction dialog. */
+export function Overlay({ title, headerEnd, closeHref, onClose, footer, children }: OverlayProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -34,10 +32,7 @@ export function Overlay({ title, headerEnd, closeHref, onClose, footer, placemen
   }, [onClose]);
 
   const frame = (
-    <div
-      className={[styles.backdrop, styles[placement]].join(" ")}
-      onClick={onClose && ((event) => event.target === event.currentTarget && onClose())}
-    >
+    <div className={styles.backdrop} onClick={onClose && ((event) => event.target === event.currentTarget && onClose())}>
       <section className={styles.panel} role="dialog" aria-modal="true">
         <header className={styles.header}>
           <div className={styles.title}>{title}</div>

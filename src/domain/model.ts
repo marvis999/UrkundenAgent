@@ -1,4 +1,4 @@
-import type { CandidateTag } from "./computeStatus";
+import type { CandidateTag, Finding } from "./computeStatus";
 import type {
   Actor,
   CaseStatus,
@@ -53,11 +53,10 @@ export interface Rect {
 
 export interface ImageEvidence {
   crop: Rect;
+  /** The document's type, as the label on the excerpt. */
   caption: string;
-  hint: string;
   /** Height of the cited page divided by its width. Absent while the page is unrendered. */
   pageAspect?: number;
-  question?: string;
   readings?: Reading[];
 }
 
@@ -87,10 +86,7 @@ export interface Candidate {
   isActive: boolean;
 }
 
-export interface Finding {
-  title: string;
-  text: string;
-}
+export type { Finding };
 
 /**
  * The atomic unit of review. Status, finding and history hang here, never on the field.
@@ -140,8 +136,6 @@ export interface Field {
   table?: FieldTable;
   candidates: Candidate[];
   request?: RequestTemplate;
-  /** Set when a request would be wrong, e.g. deliberately redacted data. */
-  noRequestReason?: string;
   /** Set while a sent request for this field has not been reconciled by a later run. */
   requestedAt?: string;
   /** A run later than the first produced a value here. */
@@ -150,24 +144,16 @@ export interface Field {
   history: HistoryEntry[];
 }
 
-export interface PhotoNote {
-  caption: string;
-  hint: string;
-}
-
 export interface Document {
   id: string;
   fileName: string;
+  /** The name a notary uses, from the fixed list in DOC_TYPES. */
   type: string;
   kind: DocumentKind;
   date: string;
   pageCount: number;
   status: DocumentStatus;
   sourceClass: SourceClass;
-  quality: string;
-  title: string;
-  subtitle: string;
-  photoNote?: PhotoNote;
   isNew?: boolean;
   /** Set once the original has been rendered, so the viewer can show real pages. */
   hasPages?: boolean;

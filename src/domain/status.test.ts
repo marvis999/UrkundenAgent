@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { computeSubfieldStatus, type StatusCandidate, type StatusContext, type StatusSubfield } from "./computeStatus";
+import { computeSubfieldStatus, explainStatus, type StatusCandidate, type StatusContext, type StatusSubfield } from "./computeStatus";
 
 /**
  * The status rules.
  *
  * Everything on screen reads from this one function -- badge, field status, the bar, the
- * counters, the banner -- and the finding agent is told its answer rather than asked to
- * guess one. So these tests are not about a component rendering: they are about the two
- * sentences the whole app rests on, that a value never exists without a source and a
- * status never exists without a reason.
+ * counters, the banner, the finding. So these tests are not about a component rendering:
+ * they are about the two sentences the whole app rests on, that a value never exists
+ * without a source and a status never exists without a reason.
  */
 
 const TODAY = "2026-09-06";
@@ -35,7 +34,8 @@ const candidate = (over: Partial<StatusCandidate> = {}): StatusCandidate => ({
   tag: "extracted",
   documentId: "d1",
   confidence: 0.95,
-  hasReadings: false,
+  readings: [],
+  sourceLabel: "Grundbuchauszug 15.11.2011, S. 2",
   ...over,
 });
 
@@ -112,8 +112,26 @@ test("a reading below the threshold is uncertain, and so is one with competing r
   const unsure = candidate({ confidence: 0.4 });
   assert.equal(computeSubfieldStatus(subfield(), [unsure], context()), "uncertain");
 
-  const ambiguous = candidate({ confidence: 0.99, hasReadings: true });
+  const ambiguous = candidate({ confidence: 0.99, readings: ["6", "8"] });
   assert.equal(computeSubfieldStatus(subfield(), [ambiguous], context()), "uncertain");
+});
+
+test("a finding is the rule that fired, filled with data, and nothing where no rule did", () => {
+  const rows = [
+    candidate({ value: "2.060.000 EUR", canonicalValue: "2060000", sourceLabel: "E-Mail 02.09.2026, S. 1" }),
+    candidate({ id: "c2", value: "2.100.000 EUR", canonicalValue: "2100000", sourceLabel: "E-Mail 02.09.2026, S. 1", documentId: "d2" }),
+  ];
+  const conflict = explainStatus("conflict", subfield(), rows, context());
+  assert.ok(conflict?.text.includes("„2.060.000 EUR“") && conflict.text.includes("„2.100.000 EUR“"));
+
+  const stale = explainStatus("outdated", subfield({ staleAfterDays: 180 }), [candidate()], context({ d1: "2011-11-15" }));
+  assert.ok(stale?.text.includes("15.11.2011") && stale.text.includes("180 Tage"));
+
+  const readings = explainStatus("uncertain", subfield(), [candidate({ readings: ["6", "8"] })], context());
+  assert.ok(readings?.text.includes("6 | 8"));
+
+  assert.equal(explainStatus("proposed", subfield(), [candidate()], context()), undefined);
+  assert.equal(explainStatus("missing", subfield({ chosenCandidateId: null }), [], context()), undefined);
 });
 
 test("a computed value says so, so that it gets read against its source", () => {

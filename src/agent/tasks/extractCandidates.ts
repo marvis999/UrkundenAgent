@@ -25,7 +25,7 @@ import { hasText, pagePart } from "./parts";
  * model cannot get subtly wrong.
  */
 
-export const EXTRACT_PROMPT_VERSION = "2026-09-07";
+export const EXTRACT_PROMPT_VERSION = "2026-09-08";
 
 /**
  * Pages per call. Beyond this the request is split, keeping document order.
@@ -36,12 +36,17 @@ export const EXTRACT_PROMPT_VERSION = "2026-09-07";
  */
 export const MAX_PAGES_PER_CALL = 4;
 
-const CropSchema = z.object({
-  /** Fractions of the page, origin top left. Stored as-is; the UI scales them. */
-  x: z.number(),
-  y: z.number(),
-  w: z.number(),
-  h: z.number(),
+/**
+ * A region on an image page, in the shape vision models are trained to return boxes in:
+ * ymin, xmin, ymax, xmax on a 0..1000 grid, origin top left. Asked for fractions of the
+ * page instead, the same models returned rectangles that were regularly a column or a
+ * third of a page off. The merge turns the grid into fractions.
+ */
+const BoxSchema = z.object({
+  ymin: z.number(),
+  xmin: z.number(),
+  ymax: z.number(),
+  xmax: z.number(),
 });
 
 const ReadingSchema = z.object({ value: z.string(), probability: z.number() });
@@ -69,11 +74,9 @@ const CandidateSchema = z.object({
   tag: z.enum(["extracted", "redacted"]),
   /** 1-based position of the page in this request, as listed in the prompt. */
   pageRef: z.number().int().positive(),
-  /** Verbatim from the page text. Null on an image page, where the crop takes its place. */
+  /** Verbatim from the page text. Null on an image page, where the box takes its place. */
   quote: z.string().nullable(),
-  crop: CropSchema.nullable(),
-  cropHint: z.string().nullable(),
-  cropQuestion: z.string().nullable(),
+  box_2d: BoxSchema.nullable(),
   confidence: z.number(),
   /** Competing readings of one passage. Null when the reading is unambiguous. */
   readings: z.array(ReadingSchema).nullable(),
@@ -179,9 +182,10 @@ Herkunft:
   Das Zitat muss die Stelle eindeutig bezeichnen: steht derselbe Wortlaut mehrfach auf der
   Seite, nimm so viel vom Satz davor oder danach dazu, bis er nur noch einmal vorkommt.
   Ein Betrag oder ein Datum allein genügt dafür meist nicht. Sonst so kurz wie möglich.
-- crop: bei einer Bildseite das Rechteck um die Fundstelle, als Anteile der Seite zwischen
-  0 und 1, Ursprung links oben. Auf einer Bildseite ist quote null, auf einer Textseite ist
-  crop null.
+- box_2d: bei einer Bildseite das Rechteck um die Fundstelle als ymin, xmin, ymax, xmax auf
+  einem Raster von 0 bis 1000 über Höhe und Breite des Bildes, Ursprung links oben. Eng um
+  die Zeile, in der der Wert steht. Auf einer Bildseite ist quote null, auf einer Textseite
+  ist box_2d null.
 - confidence: zwischen 0 und 1, wie sicher du die Stelle gelesen hast.
 - rationale: ein Satz, warum das der Wert ist.
 
@@ -191,8 +195,7 @@ Drei Antworten, die keine einfache Lesung sind, und die du geben sollst statt zu
    nicht, welcher gilt, und lasse keinen weg.
 2. Die Stelle ist nicht eindeutig zu lesen, etwa eine überschriebene Handschrift. Setze
    readings mit zwei oder drei Lesarten und ihren Wahrscheinlichkeiten, und nimm die
-   wahrscheinlichste als value. Setze cropQuestion auf die Frage, die ein Mensch
-   beantworten muss.
+   wahrscheinlichste als value.
 3. An der Stelle ist überhaupt nichts zu lesen, weil sie bewusst unlesbar gemacht wurde,
    etwa geschwärzte Mieternamen. Nur dann: tag "redacted", value null, mit der Fundstelle
    der Schwärzung. Schreibe in value nichts, auch nicht "unleserlich" oder "geschwärzt".
@@ -206,10 +209,7 @@ Unterfeld auf diesen Seiten nichts, gib dazu keinen Kandidaten.
 Umgekehrt gilt aber: steht der Wert da, dann gib ihn an. Nichts zurückzugeben, obwohl die
 Angabe auf der Seite steht, ist der schwerere Fehler — ein Feld ohne Fundstelle wird
 angefordert, und angefordert wird dann etwas, das längst vorliegt. Lieber ein Kandidat mit
-niedriger Konfidenz als gar keiner.
-
-cropHint ist ein kurzer deutscher Hinweis, was die Lesung erschwert, etwa "Stempel überdeckt
-die Spalte". Bei Textseiten null.`;
+niedriger Konfidenz als gar keiner.`;
 
 const offeredList = (offered: readonly OfferedPage[]): string =>
   offered

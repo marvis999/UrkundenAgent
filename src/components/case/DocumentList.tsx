@@ -31,7 +31,6 @@ const documentColumns: readonly Column<Document>[] = [
             {d.isNew && <Badge tone="accent">neu</Badge>}
           </>
         }
-        subtitle={d.quality}
         emphasis="strong"
       />
     ),

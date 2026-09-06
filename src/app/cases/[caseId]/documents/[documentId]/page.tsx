@@ -2,7 +2,7 @@ import { DocumentList } from "@/components/case/DocumentList";
 import { DocumentViewer } from "@/components/case/DocumentViewer";
 import { documentPageTexts } from "@/db/pages";
 import { clampPage } from "@/domain/evidence";
-import { loadCaseView, loadDocument, parsePage, type DocumentParams, type SearchParams } from "@/lib/load";
+import { loadCaseView, loadDocument, parsePage, parseString, type DocumentParams, type SearchParams } from "@/lib/load";
 import { QUERY } from "@/lib/routes";
 
 export default async function DocumentPage({ params, searchParams }: { params: DocumentParams; searchParams: SearchParams }) {
@@ -10,6 +10,9 @@ export default async function DocumentPage({ params, searchParams }: { params: D
   const document = await loadDocument(view, params);
   const query = await searchParams;
   const page = parsePage(query[QUERY.page]);
+  // Only a page of this case is a place to go back to; anything else is dropped.
+  const back = parseString(query[QUERY.back]);
+  const closeTo = back?.startsWith(`/cases/${view.case.id}`) === true ? back : undefined;
 
   // A document without page images is text, and the viewer shows the text instead. Read
   // here rather than in the case view: it is one document's worth of prose, and no other
@@ -20,7 +23,7 @@ export default async function DocumentPage({ params, searchParams }: { params: D
   return (
     <>
       <DocumentList view={view} />
-      <DocumentViewer view={view} document={document} page={page} {...(text === undefined ? {} : { text })} />
+      <DocumentViewer view={view} document={document} page={page} {...(text === undefined ? {} : { text })} {...(closeTo === undefined ? {} : { closeTo })} />
     </>
   );
 }

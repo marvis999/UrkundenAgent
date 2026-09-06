@@ -89,6 +89,29 @@ export const DOCUMENT_KIND_ICON: Record<DocumentKind, IconName> = {
   register: "building",
 };
 
+/* ---------- Document type: the name a notary uses, from a fixed list ---------- */
+
+/**
+ * Closed on purpose. The type names the source on every card ("Grundbuchauszug
+ * 15.11.2011, S. 2"), and a model may pick from this list but not write its own. A file
+ * that fits none is "Sonstiges" and is named by its file name instead.
+ */
+export const DOC_TYPES = [
+  "Grundbuchauszug",
+  "Handelsregisterauszug",
+  "Flurkarte",
+  "Flächenberechnung",
+  "Energieausweis",
+  "Mietübersicht",
+  "Mietvertrag",
+  "Kaufvertragsentwurf",
+  "Finanzierungsbestätigung",
+  "E-Mail",
+  "Notiz",
+  "Sonstiges",
+] as const;
+export type DocType = (typeof DOC_TYPES)[number];
+
 /* ---------- Case status ---------- */
 
 export const CASE_STATUSES = ["complete", "inReview", "awaitingReply", "noDocuments"] as const;

@@ -1,9 +1,16 @@
+/* Stays at the top while the case scrolls; the Anfordern button and the file name are always in reach. */
 .bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-3) var(--space-7);
+  height: var(--topbar-height);
+  padding: 0 var(--space-7);
+  background: var(--color-surface);
+  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 var(--color-border);
 }
 .group {
   display: flex;

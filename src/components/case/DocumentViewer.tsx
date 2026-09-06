@@ -20,16 +20,18 @@ interface DocumentViewerProps {
   page: number;
   /** The page's own text, for a document that is text and has no image to show. */
   text?: string;
+  /** Where closing goes: the value this was opened from, else the Unterlagen tab. */
+  closeTo?: string;
 }
 
 /** Modal viewer: photos as image with marker, text pages with the highlighted passage. */
-export function DocumentViewer({ view, document, page: requestedPage, text: pageText }: DocumentViewerProps) {
+export function DocumentViewer({ view, document, page: requestedPage, text: pageText, closeTo }: DocumentViewerProps) {
   const caseId = view.case.id;
   const page = clampPage(requestedPage, document.pageCount);
   const hits = pagesWithEvidence(view, document.id);
   const located = candidateOnPage(view, document.id, page);
   const isPhoto = document.kind === "photo";
-  const pageHref = (n: number) => routes.document(caseId, document.id, clampPage(n, document.pageCount));
+  const pageHref = (n: number) => routes.document(caseId, document.id, clampPage(n, document.pageCount), closeTo);
   // A rendered page is shown as its image; a text document has none and shows its text.
   const pageSrc = document.hasPages ? routes.pageImage(caseId, document.id, page) : undefined;
 
@@ -40,8 +42,7 @@ export function DocumentViewer({ view, document, page: requestedPage, text: page
 
   return (
     <Overlay
-      placement="center"
-      closeHref={routes.caseDocuments(caseId)}
+      closeHref={closeTo ?? routes.caseDocuments(caseId)}
       title={
         <>
           <Icon name={DOCUMENT_KIND_ICON[document.kind]} size="lg" />
@@ -82,14 +83,15 @@ export function DocumentViewer({ view, document, page: requestedPage, text: page
         <div className={styles.stage}>
           {pageSrc ? (
             <div className={styles.photo}>
-              <ImageFrame src={pageSrc} crop={located?.candidate.image?.crop} caption={document.photoNote?.caption ?? document.type} size="page" />
-              {document.photoNote && <Notice tone="neutral" icon="scan-text" text={document.photoNote.hint} size="compact" surface="white" />}
+              <ImageFrame src={pageSrc} crop={located?.candidate.image?.crop} caption={document.type} size="page" />
             </div>
           ) : (
             <div className={styles.sheet}>
               <div className={styles.sheetHeader}>
-                <Text variant="strong">{document.title || document.fileName}</Text>
-                <Text variant="muted">{document.subtitle}</Text>
+                <Text variant="strong">{document.fileName}</Text>
+                <Text variant="muted">
+                  {document.type}, {document.date}
+                </Text>
               </div>
               {/* A note is shown as what it is. A file the renderer could not open has nothing to show. */}
               {pageText === undefined ? (

@@ -149,12 +149,16 @@ export const FIELD_CATALOG: readonly FieldDefinition[] = [
     label: "Grundstücke",
     groupKey: "property",
     kind: "table",
-    subfields: [{ key: "soldParcels", label: "Verkaufte Flurstücke", valueType: "text", staleAfterDays: REGISTER_EXTRACT }],
+    subfields: [
+      { key: "address", label: "Anschrift des Objekts", valueType: "text" },
+      { key: "soldParcels", label: "Verkaufte Flurstücke", valueType: "text", staleAfterDays: REGISTER_EXTRACT },
+    ],
     request: {
       title: "Bestandsverzeichnis im aktuellen Auszug",
       text: "Sämtliche verkauften Flurstücke mit Gemarkung, Flur, Größe und Wirtschaftsart.",
     },
-    summary: ({ rows }) => join(plural(rows.length, "Flurstück", "Flurstücke"), prefixed("Flur ", rows[0]?.section ?? null)),
+    summary: ({ value, rows }) =>
+      join(value("address"), plural(rows.length, "Flurstück", "Flurstücke"), prefixed("Flur ", rows[0]?.section ?? null)),
   },
   {
     key: "purchasePrice",

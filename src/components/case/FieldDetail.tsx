@@ -3,7 +3,7 @@ import { Stacked } from "@/components/ui/Stacked";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TRACK, type Column } from "@/components/ui/Table";
 import { Text } from "@/components/ui/Text";
-import { defaultPartId, hasEvidence } from "@/domain/derive";
+import { hasEvidence } from "@/domain/derive";
 import type { CaseView, EncumbranceRow, Field, ParcelRow, ReviewPart, Subfield } from "@/domain/model";
 import { FIELD_STATUS_META, PROCEDURE_META } from "@/domain/status";
 import { HistoryList } from "./HistoryList";
@@ -69,14 +69,13 @@ const encumbranceColumns: readonly Column<EncumbranceRow>[] = [
 interface FieldDetailProps {
   view: CaseView;
   field: Field;
-  /** Undefined opens the default part; PART_NONE keeps every part closed. */
+  /** The one part open, if any. Parts stay closed until a person opens one. */
   activePartId?: string;
 }
 
 /** The expanded field: its subfields and table rows, each expandable into its own PartDetail. */
 export function FieldDetail({ view, field, activePartId }: FieldDetailProps) {
-  const openId = activePartId ?? defaultPartId(field);
-  const shared = { view, field, openId };
+  const shared = { view, field, openId: activePartId };
 
   return (
     <div className={styles.detail}>

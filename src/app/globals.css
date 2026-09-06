@@ -106,9 +106,10 @@
   --easing-standard: cubic-bezier(0.2, 0, 0, 1);
 
   /* Layout */
-  --page-width: 1120px;
+  --page-width: 1240px;
   --side-column: 300px;
   --drawer-width: 560px;
+  --topbar-height: 56px;
   --viewer-width: 1060px;
   --viewer-page-width: 560px;
   --viewer-thumbs-max-height: 70vh;

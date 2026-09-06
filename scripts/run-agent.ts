@@ -83,7 +83,6 @@ const main = async () => {
   console.log(`Unterfelder befüllt: ${report.subfieldsFilled}`);
   console.log(`Tabellenzeilen: ${report.rowsTouched}`);
   console.log(`Markiert   : ${report.quotesLocated} Zitate lokalisiert, ${report.quotesAmbiguous} nicht eindeutig`);
-  console.log(`Befunde    : ${report.findingsWritten}`);
   console.log(`Dauer      : ${Math.round((Date.now() - started) / 1000)} s`);
   console.log(`Protokoll  : ${report.summary}`);
 

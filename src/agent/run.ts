@@ -2,12 +2,12 @@ import { createOpenRouterProvider, type LlmProvider } from "./llm";
 import { failures, fulfilled, inParallel, DEFAULT_LIMIT } from "./parallel";
 import { planRun, type PlannedDocument } from "./plan";
 import { prepareCandidates, type PreparedCandidate, type RejectedCandidate } from "./merge";
-import { reviewCase } from "./review";
 import { DERIVATIONS } from "./derived";
 import { classifyDocument, type ClassifyResult, type DocumentFacts } from "./tasks/classifyDocument";
 import { extractCandidates, inCalls, type OfferedPage } from "./tasks/extractCandidates";
-import { writeFinding } from "./tasks/writeFinding";
-import { locateDocumentQuotes } from "@/db/pages";
+import { ensureCatalog } from "@/db/cases";
+import { locateDocumentQuotes, turnDocumentPage } from "@/db/pages";
+import { getCaseView } from "@/db/repository";
 import {
   chosenCandidate,
   finishRun,
@@ -18,12 +18,12 @@ import {
   saveCandidates,
   saveDerived,
   saveDocumentFacts,
-  saveFindings,
   startRun,
   type ResolvedItem,
 } from "@/db/runWriter";
+import { fieldStatus, isOpen } from "@/domain/derive";
 import type { FieldId } from "@/domain/model";
-import { FIELD_STATUS_META, REQUEST_OUTCOME_META } from "@/domain/status";
+import { REQUEST_OUTCOME_META } from "@/domain/status";
 import { canonicalize } from "@/domain/value";
 import { todayIso } from "@/lib/clock";
 import { plural } from "@/lib/format";
@@ -36,15 +36,15 @@ import { plural } from "@/lib/format";
  * runs over the same documents produce the same candidates. A model choosing what to read
  * next would make every run differ for no reason a clerk could see.
  *
- * Three model stages, each narrow, each fanned out:
+ * Two model stages, each narrow, each fanned out:
  *
  *   1. classify   one call per document. What is it, and which page holds what.
  *   2. extract    one call per field per page bundle, routed by stage 1. The values.
- *   3. findings   one call per field that still has an open subfield. The German prose.
  *
- * Between two and three sits the part no model touches: the merge checks every quote
- * against the page it claims to come from, the derivations are computed, and the status
- * rules run. Stage 3 is then told what the status already is rather than asked to guess.
+ * Everything after that is code: the merge checks every quote against the page it claims
+ * to come from, the derivations are computed, the status rules run, and the finding under
+ * a value is the rule that fired, in words the code owns. No model writes a sentence that
+ * reaches the screen; it reads values and names where they stand.
  *
  * A failure in one branch is collected, not thrown. An unreadable document costs its own
  * values and nothing else, and the run log says which ones are missing.
@@ -73,7 +73,6 @@ export interface RunReport {
   readonly candidatesWritten: number;
   readonly subfieldsFilled: number;
   readonly rowsTouched: number;
-  readonly findingsWritten: number;
   /** Quotes that could be pinned to one place on their page and so carry a marker. */
   readonly quotesLocated: number;
   /** Quotes that stand more than once on their page, so they mark nothing. */
@@ -84,20 +83,28 @@ export interface RunReport {
   readonly summary: string;
 }
 
-/** Which fields each page can contribute to, collected across every document. */
+const pageKey = (documentId: string, number: number) => `${documentId}#${number}`;
+
+/**
+ * Which fields each page can contribute to, collected across every document. A page turned
+ * upright this run is offered with its new proportions, since the plan still holds the old.
+ */
 const routePages = (
   documents: readonly PlannedDocument[],
   classified: ReadonlyMap<string, ClassifyResult>,
+  upright: ReadonlyMap<string, number>,
 ): Map<FieldId, OfferedPage[]> => {
   const byField = new Map<FieldId, OfferedPage[]>();
   for (const document of documents) {
     const routing = classified.get(document.id)?.routing;
     if (routing === undefined) continue;
     for (const page of document.pages) {
+      const total = upright.get(pageKey(document.id, page.number));
+      const offered = total !== undefined && total % 180 !== page.rotation % 180 ? { ...page, width: page.height, height: page.width } : page;
       for (const fieldKey of routing.get(page.number) ?? []) {
         byField.set(fieldKey, [
           ...(byField.get(fieldKey) ?? []),
-          { documentId: document.id, fileName: document.fileName, page },
+          { documentId: document.id, fileName: document.fileName, page: offered },
         ]);
       }
     }
@@ -127,6 +134,9 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
     if (signal?.aborted === true) throw new RunCancelled();
   };
 
+  // A subfield the catalog gained since the case was opened is written first, so the
+  // extraction has somewhere to put it.
+  await ensureCatalog(caseId);
   const plan = await planRun(caseId);
   const runId = await startRun(caseId, plan.number);
   say(`Durchlauf ${plan.number}: ${plural(plan.documents.length, "Datei", "Dateien")}, ${plural(plan.pageCount, "Seite", "Seiten")}`);
@@ -156,28 +166,32 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
   }
   const documentDate = (documentId: string) => facts.get(documentId)?.docDate ?? null;
 
+  /* ---------- Upright pages ---------- */
+
+  stopIfCancelled();
   /*
-   * The address the case is filed under: the first document that names one, in the order
-   * the case holds them -- which is the order they arrived, so it is normally the note or
-   * the e-mail the case was opened with.
-   *
-   * Deliberately not ranked by source class. A register is authoritative about ownership,
-   * not about postal addresses: it identifies a plot by Gemarkung and Flurstück, and where
-   * a street does appear it is on a scanned form read by a vision model. Preferring it
-   * traded "Beispielweg 1, 12345 Beispielstadt" for a misread postcode. This is the
-   * name of the file, not a value of the deed, and it is written once -- see
-   * `notePropertyAddress`.
+   * A scan that lies on its side is turned before anything reads values off it, so the
+   * rectangles the extraction returns and the picture they are drawn on are the same
+   * picture. The classification saw the image as stored, so its answer is the turn still
+   * missing; the page is rendered again from the original with the total, in place, and
+   * the answer cache misses on the new bytes by itself.
    */
-  const address = plan.documents.map((document) => facts.get(document.id)?.propertyAddress).find((value) => value != null);
-  if (address != null) {
-    await notePropertyAddress(caseId, address);
-    say(`  Objekt: ${address}`);
+  const upright = new Map<string, number>();
+  for (const { document, result } of fulfilled(classifyResults)) {
+    for (const page of document.pages) {
+      const turn = result.rotations.get(page.number) ?? 0;
+      if (turn === 0 || page.imagePath === null) continue;
+      const total = (page.rotation + turn) % 360;
+      await turnDocumentPage(caseId, document.id, page.number, total);
+      upright.set(pageKey(document.id, page.number), total);
+      say(`  gedreht: ${document.fileName}, Seite ${page.number}, um ${turn}°`);
+    }
   }
 
   /* ---------- 2. Extract ---------- */
 
   stopIfCancelled();
-  const byField = routePages(plan.documents, classified);
+  const byField = routePages(plan.documents, classified, upright);
   const jobs = [...byField].flatMap(([fieldKey, offered]) =>
     inCalls(offered).map((chunk) => ({ fieldKey, chunk })),
   );
@@ -267,25 +281,16 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
 
   await noteAbsences(caseId, ABSENCE_NOTE);
 
-  /* ---------- 3. Findings, on the status the rules computed ---------- */
+  /* ---------- The file's name ---------- */
 
-  stopIfCancelled();
-  const reviewed = await reviewCase(caseId, today);
-  const needsFinding = reviewed.filter((field) =>
-    field.subfields.some((subfield) => FIELD_STATUS_META[subfield.status].hasFinding),
-  );
-
-  const findingResults = await inParallel(
-    needsFinding,
-    async (field) => {
-      const findings = await writeFinding(provider, { fieldKey: field.fieldKey, subfields: field.subfields }, { today, signal });
-      await saveFindings(caseId, plan.number, field.fieldKey, findings);
-      return findings.findings.length;
-    },
-    limit,
-  );
-  allFailures.push(...failures(findingResults, (index) => `Befund ${needsFinding[index]?.fieldKey ?? "?"}`));
-  const findingsWritten = fulfilled(findingResults).reduce((sum, count) => sum + count, 0);
+  // The address the case is filed under is the value behind "Anschrift des Objekts": read
+  // off a document with a Fundstelle like every other value, and written once -- see
+  // `notePropertyAddress`. Not the register's plot description, which is not an address.
+  const address = await chosenCandidate(caseId, "parcels", "address");
+  if (address !== undefined) {
+    await notePropertyAddress(caseId, address.value);
+    say(`  Objekt: ${address.value}`);
+  }
 
   /* ---------- What the run did to the open request ---------- */
 
@@ -294,7 +299,9 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
 
   /* ---------- Close ---------- */
 
-  const open = reviewed.filter((field) => field.subfields.some((subfield) => FIELD_STATUS_META[subfield.status].isOpen));
+  // Read back through the same function the pages use, so the run log and the badges agree.
+  const fields = (await getCaseView(caseId))?.fields ?? [];
+  const open = fields.filter((field) => isOpen(fieldStatus(field))).length;
   /*
    * The summary is the run log, and the run log is where a clerk finds out what the run
    * did *not* keep. A discarded candidate is the most interesting thing the merge does --
@@ -307,10 +314,10 @@ export const runCase = async (caseId: string, options: RunOptions = {}): Promise
     `${plural(candidatesWritten, "Fundstelle", "Fundstellen")}`,
     ...(rejected.length === 0 ? [] : [`${rejected.length} Angaben verworfen`]),
     ...(quotesAmbiguous === 0 ? [] : [`${quotesAmbiguous} Zitate nicht eindeutig`]),
-    `${open.length} von ${reviewed.length} Feldern offen`,
+    `${open} von ${fields.length} Feldern offen`,
   ].join(", ");
 
   await finishRun(runId, caseId, summary);
 
-  return { candidatesWritten, subfieldsFilled, rowsTouched, findingsWritten, quotesLocated, quotesAmbiguous, resolved, rejected, failures: allFailures, summary };
+  return { candidatesWritten, subfieldsFilled, rowsTouched, quotesLocated, quotesAmbiguous, resolved, rejected, failures: allFailures, summary };
 };

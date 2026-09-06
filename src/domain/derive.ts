@@ -28,12 +28,6 @@ export const fieldStatus = (field: Field): FieldStatus => worstStatus(fieldParts
 export const fieldFinding = (field: Field): Finding | undefined =>
   byWorstFirst(fieldParts(field)).find((p) => p.finding && hasFinding(p.status))?.finding;
 
-/** Which part opens when a field is expanded: the finding, else the worst open part, else the first. */
-export const defaultPartId = (field: Field): string | undefined => {
-  const parts = byWorstFirst(fieldParts(field));
-  return (parts.find((p) => p.finding && hasFinding(p.status)) ?? parts.find((p) => isOpen(p.status)) ?? parts[0])?.id;
-};
-
 /** Stable string form of a target, so two targets compare with one equality check. */
 const targetKey = (t: CandidateTarget) => (t.kind === "subfield" ? `subfield:${t.subfieldId}` : `row:${t.rowId}`);
 

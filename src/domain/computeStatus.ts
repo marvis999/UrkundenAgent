@@ -1,12 +1,13 @@
 import type { FieldStatus } from "./status";
-import { daysBetween, toIsoDate } from "./value";
+import { daysBetween, fromIsoDate, toIsoDate } from "./value";
 
 /**
  * Subfield status, computed from the stored rows. Never persisted.
  *
  * The eight rules from docs/Plan/Datenmodell.md, first match wins. Everything the UI
- * shows -- badge, field status, bar, counters, export -- comes from this one function,
- * so a value cannot look confirmed in one place and unconfirmed in another.
+ * shows -- badge, field status, bar, counters -- comes from this one function, so a value
+ * cannot look confirmed in one place and unconfirmed in another. `explainStatus` puts the
+ * rule that fired into words, from the same input.
  */
 
 export interface StatusCandidate {
@@ -16,7 +17,10 @@ export interface StatusCandidate {
   tag: CandidateTag;
   documentId: string | null;
   confidence: number | null;
-  hasReadings: boolean;
+  /** Competing readings of the passage; empty when it was read cleanly. */
+  readings: readonly string[];
+  /** "Grundbuchauszug 15.11.2011, S. 2", so a finding can name the source. */
+  sourceLabel: string;
 }
 
 export type CandidateTag = "extracted" | "manual" | "derived" | "redacted";
@@ -38,6 +42,11 @@ export interface StatusContext {
   today: string;
 }
 
+export interface Finding {
+  title: string;
+  text: string;
+}
+
 const isStaleBySource = (
   candidate: StatusCandidate,
   subfield: StatusSubfield,
@@ -54,20 +63,28 @@ const isStaleByValue = (candidate: StatusCandidate, subfield: StatusSubfield, co
   return validUntil !== undefined && daysBetween(validUntil, context.today) > 0;
 };
 
+/** The extracted candidates that disagree: one per canonical form, in the order found. */
+const disagreeing = (candidates: readonly StatusCandidate[]): StatusCandidate[] => {
+  const byForm = new Map<string, StatusCandidate>();
+  for (const candidate of candidates) {
+    if (candidate.tag === "extracted" && candidate.canonicalValue !== null && !byForm.has(candidate.canonicalValue)) {
+      byForm.set(candidate.canonicalValue, candidate);
+    }
+  }
+  return [...byForm.values()];
+};
+
 /**
  * Rule 4 compares sources with each other, so only extracted candidates take part, and
  * only while the chosen value is itself a source reading. Once a person has put a manual
  * value in front, the disagreement between documents has been decided and is history.
  * The canonical form is written with the candidate, so this is a plain string comparison.
  */
-const hasConflict = (candidates: readonly StatusCandidate[], chosen: StatusCandidate): boolean => {
-  if (chosen.tag !== "extracted") return false;
-  const forms = new Set(candidates.filter((c) => c.tag === "extracted" && c.canonicalValue !== null).map((c) => c.canonicalValue));
-  return forms.size > 1;
-};
+const hasConflict = (candidates: readonly StatusCandidate[], chosen: StatusCandidate): boolean =>
+  chosen.tag === "extracted" && disagreeing(candidates).length > 1;
 
 const isUncertain = (candidate: StatusCandidate, subfield: StatusSubfield): boolean =>
-  candidate.hasReadings || (candidate.confidence !== null && candidate.confidence < subfield.confidenceThreshold);
+  candidate.readings.length > 0 || (candidate.confidence !== null && candidate.confidence < subfield.confidenceThreshold);
 
 export const computeSubfieldStatus = (
   subfield: StatusSubfield,
@@ -85,4 +102,52 @@ export const computeSubfieldStatus = (
   if (isUncertain(chosen, subfield)) return "uncertain";
   if (chosen.tag === "derived") return "derived";
   return "proposed";
+};
+
+/**
+ * The reason behind a status, in words the code owns.
+ *
+ * No model writes a finding. Every sentence below is a template, and what fills it is
+ * data: the value as found, the label of its source, a date, a threshold. A status with no
+ * template stands alone -- a bare "widersprüchlich" is true, and an invented explanation
+ * would only look like one.
+ */
+export const explainStatus = (
+  status: FieldStatus,
+  subfield: StatusSubfield,
+  candidates: readonly StatusCandidate[],
+  context: StatusContext,
+): Finding | undefined => {
+  const chosen = candidates.find((c) => c.id === subfield.chosenCandidateId);
+  if (chosen === undefined) return undefined;
+
+  switch (status) {
+    case "conflict": {
+      const readings = disagreeing(candidates).map((c) => `„${c.value ?? ""}“ laut ${c.sourceLabel}`);
+      return { title: "Zwei Quellen nennen verschiedene Werte", text: `${readings.join("; ")}. Welcher gilt, entscheidet eine Person.` };
+    }
+    case "outdated": {
+      if (isStaleByValue(chosen, subfield, context)) {
+        return { title: "Gültigkeit abgelaufen", text: `Gültig bis ${chosen.value}; heute ist der ${fromIsoDate(context.today)}.` };
+      }
+      const issued = chosen.documentId === null ? undefined : context.documentDate(chosen.documentId);
+      if (issued === undefined || subfield.staleAfterDays === null) return undefined;
+      return {
+        title: "Quelle zu alt",
+        text: `${chosen.sourceLabel} ist vom ${fromIsoDate(issued)}, älter als die ${subfield.staleAfterDays} Tage, die für diesen Wert gelten.`,
+      };
+    }
+    case "uncertain": {
+      if (chosen.readings.length > 0) {
+        return { title: "Lesung nicht eindeutig", text: `Mögliche Lesarten: ${chosen.readings.join(" | ")}. Am Bild entscheiden.` };
+      }
+      if (chosen.confidence === null) return undefined;
+      return {
+        title: "Lesung unsicher",
+        text: `Mit Konfidenz ${chosen.confidence.toFixed(2)} gelesen, unter der Schwelle von ${subfield.confidenceThreshold.toFixed(2)}.`,
+      };
+    }
+    default:
+      return undefined;
+  }
 };

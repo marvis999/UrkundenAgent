@@ -50,7 +50,6 @@ export function AddNote({ caseId }: AddNoteProps) {
       </Button>
       {open && (
         <Overlay
-          placement="center"
           onClose={() => setOpen(false)}
           title={
             <>

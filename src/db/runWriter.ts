@@ -1,9 +1,7 @@
-import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { PreparedCandidate } from "@/agent/merge";
 import { preferredCandidate } from "@/agent/merge";
 import type { DocumentFacts } from "@/agent/tasks/classifyDocument";
-import type { Findings } from "@/agent/tasks/writeFinding";
 import type { FieldId } from "@/domain/model";
 import { REQUEST_OUTCOME_META, type RequestOutcome } from "@/domain/status";
 import { nowIso } from "@/lib/clock";
@@ -203,18 +201,11 @@ export const recordProgress = (runId: string, documentId: string, pagesRead: num
 
 export const saveDocumentFacts = (documentId: string, facts: DocumentFacts) =>
   query(
-    `UPDATE document SET doc_type = $1, doc_date = $2, source_class = $3, status = $4, quality = $5,
-                         title = $6, subtitle = $7, photo_caption = $8, photo_hint = $9
-     WHERE id = $10`,
+    "UPDATE document SET doc_type = $1, doc_date = $2, source_class = $3, status = $4 WHERE id = $5",
     facts.docType,
     facts.docDate,
     facts.sourceClass,
     facts.status,
-    facts.quality,
-    facts.title,
-    facts.subtitle,
-    facts.photoCaption,
-    facts.photoHint,
     documentId,
   );
 
@@ -285,7 +276,9 @@ const CANDIDATE_INSERT = `
                          source_label, note, source_class, crop, confidence, readings, rationale,
                          source_candidate_id, run, created_at)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL, $17, $18)
-  ON CONFLICT (id) DO NOTHING`;
+  ON CONFLICT (id) DO UPDATE SET crop = COALESCE(EXCLUDED.crop, candidate.crop)`;
+// The same passage read again is the same candidate. The one thing a later reading may
+// improve is where on the image it sits, so a re-read replaces the rectangle and nothing else.
 
 /**
  * True while nobody has taken responsibility for the value: no candidate chosen, or one
@@ -409,33 +402,6 @@ export const noteAbsences = (caseId: string, note: string) =>
     caseId,
     note,
   );
-
-/* ---------- Findings and the request text ---------- */
-
-export const saveFindings = (caseId: string, run: number, fieldKey: FieldId, findings: Findings) =>
-  transaction(async (client) => {
-    const targets = await loadTargets(client, caseId, fieldKey);
-    if (targets === undefined) return;
-
-    await client.query(
-      "UPDATE field SET no_request_reason = $1, request_title = $2, request_text = $3 WHERE id = $4",
-      [findings.noRequestReason, findings.requestTitle, findings.requestText, targets.fieldId],
-    );
-
-    for (const finding of findings.findings) {
-      const subfieldId = targets.subfieldIds.get(finding.subfieldKey);
-      if (subfieldId === undefined) continue;
-      // One finding per subfield: the previous run's wording is replaced, not stacked.
-      await client.query("DELETE FROM finding WHERE subfield_id = $1", [subfieldId]);
-      await client.query("INSERT INTO finding (id, field_id, subfield_id, title, text) VALUES ($1, $2, $3, $4, $5)", [
-        randomUUID(),
-        targets.fieldId,
-        subfieldId,
-        finding.title,
-        finding.text,
-      ]);
-    }
-  });
 
 /* ---------- Derived values ---------- */
 

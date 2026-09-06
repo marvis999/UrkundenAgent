@@ -96,26 +96,30 @@ export function CaseChrome({ view, children }: CaseChromeProps) {
           </>
         }
       />
-      <div className={styles.band}>
-        <Tabs items={tabs} />
-        <Notice
-          tone={banner.tone}
-          icon={banner.icon}
-          title={banner.title}
-          text={banner.text}
-          size="prominent"
-          attached
-          actions={
-            <>
-              {banner.secondary && renderAction(c.id, banner.secondary, "start")}
-              {renderAction(c.id, banner.action, "end")}
-            </>
-          }
-        />
+      {/* Everything below the header shares one column, so a drawer on the right moves the
+          tabs, the banner and the page together. */}
+      <div className={styles.content}>
+        <div className={styles.band}>
+          <Tabs items={tabs} />
+          <Notice
+            tone={banner.tone}
+            icon={banner.icon}
+            title={banner.title}
+            text={banner.text}
+            size="prominent"
+            attached
+            actions={
+              <>
+                {banner.secondary && renderAction(c.id, banner.secondary, "start")}
+                {renderAction(c.id, banner.action, "end")}
+              </>
+            }
+          />
+        </div>
+        {/* Only while a run is in flight; a case at rest polls nothing. */}
+        {c.phase === "analysis" && <AutoRefresh />}
+        {children}
       </div>
-      {/* Only while a run is in flight; a case at rest polls nothing. */}
-      {c.phase === "analysis" && <AutoRefresh />}
-      {children}
     </div>
   );
 }

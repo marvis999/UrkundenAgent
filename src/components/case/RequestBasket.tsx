@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { sendRequestAction, toggleBasketAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { Badge } from "@/components/ui/Badge";
@@ -6,7 +7,6 @@ import { FormField } from "@/components/ui/FormField";
 import { Icon } from "@/components/ui/Icon";
 import { ListItem } from "@/components/ui/ListItem";
 import { Notice } from "@/components/ui/Notice";
-import { Overlay } from "@/components/ui/Overlay";
 import { Stack } from "@/components/ui/layout";
 import { Text } from "@/components/ui/Text";
 import type { CaseView } from "@/domain/model";
@@ -21,50 +21,37 @@ const LETTER_BODY = "request-letter-body";
 
 interface RequestBasketProps {
   view: CaseView;
+  /** The main view, which stays in use while the basket is open. */
+  children: ReactNode;
 }
 
-/** The Anfordern basket: positions bound to their fields, turned into one letter. */
-export function RequestBasket({ view }: RequestBasketProps) {
+/**
+ * The Anfordern basket: positions bound to their fields, turned into one letter.
+ *
+ * A drawer beside the main view, not a modal over it: the positions come from the fields,
+ * so a person adds one, reads the next field and adds another without closing anything.
+ */
+export function RequestBasket({ view, children }: RequestBasketProps) {
   const items = basketItems(view);
-  const closeHref = routes.case(view.case.id);
-  // Once sent, the same drawer becomes a record of what went out; positions stay put.
+  // Once sent, the same panel becomes a record of what went out; positions stay put.
   const sent = view.requestSentAt !== undefined;
 
   return (
-    <Overlay
-      placement="side"
-      closeHref={closeHref}
-      title={
-        <>
-          <Icon name="list-checks" size="lg" />
-          <span>Anforderung</span>
-          <Text variant="muted">
-            {plural(items.length, "Position", "Positionen")} {sent ? `gesendet am ${view.requestSentAt}` : "aus den Befunden"}
-          </Text>
-        </>
-      }
-      footer={
-        items.length > 0 && (
-          <>
+    <>
+      {children}
+      {/* data-drawer: the case chrome reads it and makes room on the right. */}
+      <aside className={styles.panel} aria-label="Anforderung" data-drawer>
+        <header className={styles.header}>
+          <div className={styles.title}>
+            <Icon name="list-checks" size="lg" />
+            <span>Anforderung</span>
             <Text variant="muted">
-              {sent ? "Diese Felder warten auf Rückmeldung." : "Nach dem Senden warten diese Felder auf Rückmeldung."}
+              {plural(items.length, "Position", "Positionen")} {sent ? `gesendet am ${view.requestSentAt}` : "aus den Befunden"}
             </Text>
-            <span className={styles.footerActions}>
-              <CopyText targetId={LETTER_BODY} label="Text kopieren" />
-              {/* Once sent, the drawer is the record of what went out. Sending again is a
-                  different letter, and the app does not write that one -- copying the text
-                  into a mail client is what a follow-up actually is here. */}
-              {!sent && (
-                <Button variant="accent" icon="send" form={LETTER_FORM}>
-                  Senden
-                </Button>
-              )}
-            </span>
-          </>
-        )
-      }
-    >
-      <div className={styles.body}>
+          </div>
+          <Button variant="secondary" icon="x" href={routes.case(view.case.id)} label="Schließen" />
+        </header>
+        <div className={styles.body}>
         {items.length === 0 ? (
           <Notice
             tone="neutral"
@@ -109,7 +96,26 @@ export function RequestBasket({ view }: RequestBasketProps) {
             </form>
           </Stack>
         )}
-      </div>
-    </Overlay>
+        </div>
+        {items.length > 0 && (
+          <footer className={styles.footer}>
+            <Text variant="muted">
+              {sent ? "Diese Felder warten auf Rückmeldung." : "Nach dem Senden warten diese Felder auf Rückmeldung."}
+            </Text>
+            <span className={styles.footerActions}>
+              <CopyText targetId={LETTER_BODY} label="Text kopieren" />
+              {/* Once sent, the panel is the record of what went out. Sending again is a
+                  different letter, and the app does not write that one -- copying the text
+                  into a mail client is what a follow-up actually is here. */}
+              {!sent && (
+                <Button variant="accent" icon="send" form={LETTER_FORM}>
+                  Senden
+                </Button>
+              )}
+            </span>
+          </footer>
+        )}
+      </aside>
+    </>
   );
 }

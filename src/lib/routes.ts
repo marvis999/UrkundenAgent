@@ -4,10 +4,9 @@ export const QUERY = {
   field: "field",
   part: "part",
   page: "page",
+  /** Where the document viewer's close button goes: the field it was opened from. */
+  back: "back",
 } as const;
-
-/** Explicit "no part open" value; part ids never take this value. */
-export const PART_NONE = "none";
 
 type QueryValue = string | number | undefined;
 
@@ -27,7 +26,7 @@ export const fieldAnchor = (fieldId: string) => `field-${fieldId}`;
 export const partAnchor = (fieldId: string, partId: string) => `${fieldAnchor(fieldId)}-part-${partId}`;
 
 interface CaseRouteOptions {
-  /** Subfield or table row to expand inside the field. Omit for the default part, PART_NONE for none. */
+  /** Subfield or table row to expand inside the field. Omit to keep every part closed. */
   part?: string;
   /** Scrolls to the expanded field instead of the page top. */
   anchor?: boolean;
@@ -43,8 +42,9 @@ export const routes = {
       options.anchor && fieldId ? fieldAnchor(fieldId) : undefined,
     ),
   caseDocuments: (caseId: string) => `/cases/${caseId}/documents`,
-  document: (caseId: string, documentId: string, page?: number) =>
-    withQuery(`/cases/${caseId}/documents/${documentId}`, { [QUERY.page]: page }),
+  /** `back` is the page to return to on close; without it the viewer closes to the Unterlagen tab. */
+  document: (caseId: string, documentId: string, page?: number, back?: string) =>
+    withQuery(`/cases/${caseId}/documents/${documentId}`, { [QUERY.page]: page, [QUERY.back]: back }),
   /** The rendered page image, served through the case. */
   pageImage: (caseId: string, documentId: string, page: number) => `/api/cases/${caseId}/documents/${documentId}/pages/${page}`,
   caseDraft: (caseId: string) => `/cases/${caseId}/draft`,

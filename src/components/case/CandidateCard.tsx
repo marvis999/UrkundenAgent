@@ -27,7 +27,11 @@ const REDACTED_VALUE = "unlesbar gemacht";
 /** One Fundstelle. Several of these stand side by side with equal rank; only a human picks. */
 export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed, pageSrc }: CandidateCardProps) {
   // A manual correction or a derived value has no document behind it; its origin is its reason.
-  const documentHref = candidate.documentId === undefined ? undefined : routes.document(caseId, candidate.documentId, candidate.page);
+  // The viewer closes back to this value, not to the Unterlagen tab.
+  const documentHref =
+    candidate.documentId === undefined
+      ? undefined
+      : routes.document(caseId, candidate.documentId, candidate.page, routes.case(caseId, fieldId, { part: partId }));
   const activeLabel = confirmed ? "im Feld, bestätigt" : "im Feld, nicht bestätigt";
   const adoptLabel = candidate.isActive ? "Wert bestätigen" : "Diesen Wert nehmen";
 
@@ -50,7 +54,8 @@ export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed, p
       </header>
 
       {candidate.quote && <blockquote className={styles.quote}>{`„${candidate.quote}“`}</blockquote>}
-      {!candidate.quote && candidate.rationale && <Text variant="muted">{candidate.rationale}</Text>}
+      {/* A person's reason is shown; a model's sentence about its own reading is not. */}
+      {candidate.tag === "manual" && candidate.rationale && <Text variant="muted">{candidate.rationale}</Text>}
 
       {candidate.image && (
         <div className={styles.image}>
@@ -70,10 +75,8 @@ export function CandidateCard({ caseId, fieldId, partId, candidate, confirmed, p
               }
             />
           )}
-          {candidate.image.hint && <Text variant="muted">{candidate.image.hint}</Text>}
           {candidate.image.readings && (
             <div className={styles.readings}>
-              {candidate.image.question && <Text variant="label">{candidate.image.question}</Text>}
               {/* Choosing one is the whole point of `Lesung unsicher`: the model could not
                   tell the characters apart, a person looks at the scan and decides. */}
               <OptionGroup

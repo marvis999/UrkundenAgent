@@ -44,12 +44,7 @@ CREATE TABLE IF NOT EXISTS document (
   doc_date        date,
   page_count      integer NOT NULL DEFAULT 0,
   source_class    text NOT NULL,
-  quality         text NOT NULL DEFAULT '',
   status          text NOT NULL,
-  title           text NOT NULL DEFAULT '',
-  subtitle        text NOT NULL DEFAULT '',
-  photo_caption   text,
-  photo_hint      text,
   received_in_run integer NOT NULL DEFAULT 1,
   -- Display order within the case; imports append.
   sort_order      integer NOT NULL DEFAULT 0,
@@ -70,12 +65,16 @@ CREATE TABLE IF NOT EXISTS page (
   width       integer NOT NULL,
   height      integer NOT NULL,
   text        text NOT NULL DEFAULT '',
+  -- Degrees clockwise the stored image was turned to stand upright. A run sets it for a
+  -- scan that lay on its side, and the quote markers follow the same turn.
+  rotation    integer NOT NULL DEFAULT 0,
   UNIQUE (document_id, number)
 );
 
--- image_path was NOT NULL before text documents existed. Stated as an idempotent ALTER so
--- an existing database picks the change up on the next start, without a reset.
+-- image_path was NOT NULL before text documents existed, and rotation arrived later.
+-- Stated as idempotent ALTERs so an existing database picks them up on the next start.
 ALTER TABLE page ALTER COLUMN image_path DROP NOT NULL;
+ALTER TABLE page ADD COLUMN IF NOT EXISTS rotation integer NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS field (
   id         text PRIMARY KEY,
@@ -85,20 +84,8 @@ CREATE TABLE IF NOT EXISTS field (
   group_key  text NOT NULL,
   sort_order integer NOT NULL,
   kind       text NOT NULL CHECK (kind IN ('values', 'table')),
-  -- Set when a request would be wrong, e.g. deliberately redacted data.
-  no_request_reason text,
-  -- What a run concluded should be requested for this field. NULL falls back to the
-  -- catalog template: the catalog states the general case, a run states this one.
-  request_title text,
-  request_text  text,
   UNIQUE (case_id, key)
 );
-
--- The two request columns arrived after the table did, and CREATE TABLE IF NOT EXISTS
--- does not add a column to a table that already exists. Stated as an idempotent ALTER so
--- a database from before they existed picks them up on the next start, without a reset.
-ALTER TABLE field ADD COLUMN IF NOT EXISTS request_title text;
-ALTER TABLE field ADD COLUMN IF NOT EXISTS request_text  text;
 
 CREATE TABLE IF NOT EXISTS subfield (
   id         text PRIMARY KEY,
@@ -203,15 +190,6 @@ BEGIN
 END
 $$;
 
--- One per subfield at most; the next run replaces the wording rather than stacking it.
-CREATE TABLE IF NOT EXISTS finding (
-  id               text PRIMARY KEY,
-  field_id         text NOT NULL REFERENCES field(id) ON DELETE CASCADE,
-  subfield_id      text REFERENCES subfield(id) ON DELETE CASCADE,
-  title            text NOT NULL,
-  text             text NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS history (
   id           text PRIMARY KEY,
   field_id     text NOT NULL REFERENCES field(id) ON DELETE CASCADE,
@@ -258,18 +236,22 @@ CREATE TABLE IF NOT EXISTS run_document (
   PRIMARY KEY (run_id, document_id)
 );
 
--- Columns that were written and never read. Dropped idempotently, so a database from
--- before loses them on the next start and a fresh one never has them.
+-- What earlier versions stored and this one does not: columns nothing read, the prose a
+-- model wrote about documents, and the finding table -- a finding is computed from the
+-- status now, never stored. Dropped idempotently, so a database from before follows on
+-- the next start and a fresh one never has them.
 ALTER TABLE case_file DROP COLUMN IF EXISTS catalog_version, DROP COLUMN IF EXISTS recipient_name, DROP COLUMN IF EXISTS recipient_email;
 ALTER TABLE run       DROP COLUMN IF EXISTS pages_read, DROP COLUMN IF EXISTS model, DROP COLUMN IF EXISTS prompt_version;
 ALTER TABLE subfield  DROP COLUMN IF EXISTS confirmed_by, DROP COLUMN IF EXISTS confirmed_at;
 ALTER TABLE candidate DROP COLUMN IF EXISTS created_by;
-ALTER TABLE finding   DROP COLUMN IF EXISTS table_row_id, DROP COLUMN IF EXISTS created_in_run, DROP COLUMN IF EXISTS resolved_in_run;
+ALTER TABLE document  DROP COLUMN IF EXISTS quality, DROP COLUMN IF EXISTS title, DROP COLUMN IF EXISTS subtitle,
+                      DROP COLUMN IF EXISTS photo_caption, DROP COLUMN IF EXISTS photo_hint;
+ALTER TABLE field     DROP COLUMN IF EXISTS no_request_reason, DROP COLUMN IF EXISTS request_title, DROP COLUMN IF EXISTS request_text;
+DROP TABLE IF EXISTS finding;
 
 CREATE INDEX IF NOT EXISTS candidate_by_subfield ON candidate (subfield_id);
 CREATE INDEX IF NOT EXISTS candidate_by_row      ON candidate (table_row_id);
 CREATE INDEX IF NOT EXISTS history_by_field      ON history (field_id, run);
-CREATE INDEX IF NOT EXISTS finding_by_field      ON finding (field_id);
 CREATE INDEX IF NOT EXISTS document_by_case      ON document (case_id);
 CREATE INDEX IF NOT EXISTS page_by_document      ON page (document_id, number);
 CREATE INDEX IF NOT EXISTS field_by_case         ON field (case_id, sort_order);

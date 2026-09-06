@@ -24,6 +24,8 @@ export interface PlannedPage {
   readonly imagePath: string | null;
   readonly width: number;
   readonly height: number;
+  /** Degrees clockwise the stored image has already been turned upright. */
+  readonly rotation: number;
   /**
    * The text layer, empty for a scan or a photo. Empty is the signal to send the image
    * instead: it is the difference between reading a page and looking at one.
@@ -76,6 +78,7 @@ const toPage = (row: Row): PlannedPage => {
     imagePath: imagePath === null ? null : path.join(documentsDirectory(), imagePath),
     width: int(row.width),
     height: int(row.height),
+    rotation: int(row.rotation),
     text: text(row.text),
   };
 };
@@ -91,7 +94,7 @@ export const planRun = async (caseId: string): Promise<RunPlan> => {
     nextRunNumber(caseId),
     query(UNREAD_DOCUMENTS, caseId),
     query(
-      `SELECT p.document_id, p.number, p.image_path, p.width, p.height, p.text
+      `SELECT p.document_id, p.number, p.image_path, p.width, p.height, p.rotation, p.text
        FROM page p JOIN document d ON d.id = p.document_id
        WHERE d.case_id = $1 ORDER BY p.document_id, p.number`,
       caseId,
